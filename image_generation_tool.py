@@ -1,0 +1,253 @@
+from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+from tencentcloud.hunyuan.v20230901 import hunyuan_client, models
+import json
+import base64
+from typing import Dict, List, Optional
+import asyncio
+import aiohttp
+import os
+import sys
+
+# Function to print debug messages to stderr instead of stdout
+def debug_print(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+class ImageGenerationTool:
+    def __init__(self, secret_id: str, secret_key: str):
+        """Initialize image generation tool
+        
+        Args:
+            secret_id: Tencent Cloud API Secret ID
+            secret_key: Tencent Cloud API Secret Key
+        """
+        self.cred = credential.Credential(secret_id, secret_key)
+        self.client = hunyuan_client.HunyuanClient(self.cred, "ap-guangzhou")
+    
+    async def generate_images(self, query: str, style: str = "riman",resolution: str = "1024:1024",negative_prompt: str = "") -> List[Dict]:
+        """Generate images using Hunyuan text-to-image model
+        
+        Args:
+            query: Image description text
+            style: Drawing style, default is Japanese anime style
+            
+        Returns:
+            List[Dict]: List of generated image information
+        """
+        try:
+            debug_print(f"[DEBUG] generate_images call started: query={query}, style={style}, resolution={resolution}")
+            # Create request object
+            req = models.SubmitHunyuanImageJobRequest()
+            
+            # Set request parameters
+            req.Prompt = query
+            req.Style = style
+            req.Resolution = resolution
+            req.Num = 1  # Default generate 1 image
+            req.Revise = 1  # Enable prompt expansion
+            req.LogoAdd = 0  # No watermark
+            
+            if negative_prompt:
+                req.NegativePrompt = negative_prompt
+            
+            debug_print(f"[DEBUG] Calling Tencent API SubmitHunyuanImageJob: Prompt={query}, Style={style}, Resolution={resolution}")
+            
+            # Try to call interface, retry on failure
+            job_id = None
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    resp = self.client.SubmitHunyuanImageJob(req)
+                    job_id = resp.JobId
+                    debug_print(f"[DEBUG] Successfully submitted task, JobId={job_id}")
+                    break
+                except TencentCloudSDKException as e:
+                    error_msg = str(e)
+                    debug_print(f"[ERROR] Task submission failed (attempt {attempt+1}/{max_retries}): {error_msg}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(2)  # Wait 2 seconds before retrying
+                    else:
+                        raise  # Retry count exhausted, continue to throw exception
+            
+            if not job_id:
+                debug_print("[ERROR] Unable to get task ID")
+                return [{
+                    "error": "Failed to create image generation task",
+                    "content_type": "text/plain"
+                }]
+            
+            # Wait for task completion and get results
+            image_result = await self._wait_for_job_completion(job_id)
+            
+            if image_result is None:
+                debug_print("[ERROR] Image generation failed, returning empty result")
+                return [{
+                    "error": "Image generation failed, unable to get image result",
+                    "content_type": "text/plain"
+                }]
+            
+            debug_print(f"[DEBUG] Image generation successful: image_url={image_result.get('url', 'No URL')}")
+            # Check image data
+            if not image_result.get("image_data"):
+                debug_print("[ERROR] Image data is empty")
+                return [{
+                    "error": "Image data is empty",
+                    "content_type": "text/plain"
+                }]
+            
+            # Ensure image data is properly encoded
+            try:
+                encoded_image = base64.b64encode(image_result["image_data"]).decode('utf-8')
+                debug_print(f"[DEBUG] Image successfully encoded to base64, length: {len(encoded_image)}")
+            except Exception as e:
+                error_msg = str(e)
+                debug_print(f"[ERROR] Image encoding failed: {error_msg}")
+                return [{
+                    "error": f"Image encoding failed: {error_msg}",
+                    "content_type": "text/plain"
+                }]
+            
+            # Return result containing all necessary fields
+            result = [{
+                "content": encoded_image,
+                "content_type": "image/jpeg",
+                "description": query,
+                "style": style
+            }]
+            debug_print(f"[DEBUG] Returning result: {result[0].keys()}")
+            
+            # Check if result can be correctly JSON serialized
+            try:
+                json_result = json.dumps(result)
+                debug_print(f"[DEBUG] Result can be successfully JSON serialized")
+            except Exception as e:
+                debug_print(f"[ERROR] Result cannot be JSON serialized: {e}")
+                # Try to troubleshoot and fix the problem
+                try:
+                    # Check if each field can be JSON serialized
+                    fields = ["content", "content_type", "description", "style"]
+                    for field in fields:
+                        try:
+                            json.dumps({field: result[0][field]})
+                        except Exception as field_error:
+                            debug_print(f"[ERROR] Field '{field}' cannot be JSON serialized: {field_error}")
+                except Exception as fix_error:
+                    debug_print(f"[ERROR] Error trying to fix JSON serialization problem: {fix_error}")
+            
+            return result
+            
+        except TencentCloudSDKException as err:
+            error_msg = str(err)
+            debug_print(f"[ERROR] Failed to generate image: {error_msg}, Error type: {type(err)}")
+            debug_print(f"[ERROR] Detailed information: {error_msg}")
+            return [{
+                "error": f"API call failed: {error_msg}",
+                "content_type": "text/plain"
+            }]
+        except Exception as e:
+            error_msg = str(e)
+            debug_print(f"[ERROR] Unexpected error: {error_msg}, Error type: {type(e)}")
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            return [{
+                "error": f"Error occurred during image generation: {error_msg}",
+                "content_type": "text/plain"
+            }]
+    
+    async def _wait_for_job_completion(self, job_id: str, max_retries: int = 60) -> Optional[Dict]:
+        """Wait for task completion and get results"""
+        try:
+            debug_print(f"[DEBUG] Start waiting for task completion, JobId={job_id}, max_retries={max_retries}")
+            for attempt in range(max_retries):
+                req = models.QueryHunyuanImageJobRequest()
+                req.JobId = job_id
+                
+                debug_print(f"[DEBUG] Query task status, attempt #{attempt+1}, JobId={job_id}")
+                try:
+                    resp = self.client.QueryHunyuanImageJob(req)
+                    # Print response content for debugging
+                    debug_print(f"[DEBUG] Task status response: {resp.to_json_string()}")
+                    
+                    # Check task status code
+                    status_code = resp.JobStatusCode
+                    debug_print(f"[DEBUG] Task status code: {status_code}")
+                    
+                    if status_code == "5":   # 1: Waiting, 2: Running, 4: Processing failed, 5: Processing completed.
+                        if resp.ResultImage and len(resp.ResultImage) > 0:
+                            image_url = resp.ResultImage[0]
+                            debug_print(f"[DEBUG] Image generation completed, ResultImage: {resp.ResultImage}")
+                            debug_print(f"[DEBUG] Start downloading image: {image_url}")
+                            
+                            # Add retry logic for downloading images
+                            for download_attempt in range(3):  # Try downloading 3 times
+                                image_data = await self._download_image(image_url)
+                                if image_data:
+                                    debug_print(f"[DEBUG] Image download successful, size: {len(image_data)} bytes")
+                                    return {
+                                        "image_data": image_data,
+                                        "url": image_url
+                                    }
+                                else:
+                                    debug_print(f"[WARNING] Image download failed, attempt #{download_attempt+1}/3")
+                                    await asyncio.sleep(1)
+                            
+                            debug_print("[ERROR] Image download failed, maximum retry count reached")
+                            return None
+                        else:
+                            debug_print("[ERROR] Task completed but no image result")
+                            return None
+                    elif status_code == "4":  # Processing failed
+                        debug_print("[ERROR] Task processing failed")
+                        return None
+                    else:
+                        debug_print(f"[DEBUG] Task still in progress, status code: {status_code}, waiting...")
+                        await asyncio.sleep(2)  # Wait 2 seconds before checking again
+                except TencentCloudSDKException as e:
+                    error_msg = str(e)
+                    debug_print(f"[ERROR] Error querying task status: {error_msg}")
+                    await asyncio.sleep(2)  # Wait 2 seconds before retrying
+            
+            debug_print(f"[ERROR] Task not completed after {max_retries} retries")
+            return None
+        except Exception as e:
+            error_msg = str(e)
+            debug_print(f"[ERROR] Error waiting for task completion: {error_msg}")
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            return None
+    
+    async def _download_image(self, url: str) -> bytes:
+        """Download image from URL
+        
+        Args:
+            url: Image URL
+            
+        Returns:
+            bytes: Image data as bytes
+        """
+        debug_print(f"[DEBUG] Downloading image from URL: {url}")
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        image_data = await response.read()
+                        debug_print(f"[DEBUG] Image downloaded successfully, size: {len(image_data)} bytes")
+                        return image_data
+                    else:
+                        debug_print(f"[ERROR] Failed to download image, status code: {response.status}")
+                        return None
+        except Exception as e:
+            error_msg = str(e)
+            debug_print(f"[ERROR] Error downloading image: {error_msg}")
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            return None
+
+
+if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
+
+    tool = ImageGenerationTool(secret_id=os.getenv("TENCENT_SECRET_ID"), secret_key=os.getenv("TENCENT_SECRET_KEY"))
+    result = asyncio.run(tool.generate_images("A small flower in a garden", style="xieshi"))
+    debug_print(result)
