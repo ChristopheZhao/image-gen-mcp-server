@@ -161,10 +161,12 @@ You can also ask Cursor to design images for your website ✨. Cursor can use th
 Tip: You don't need to manually move the generated images from the save directory to your project directory. Cursor will handle this automatically after your approval. This is one of the main advantages of using Cursor.
 
 - Planning the move 
-![plan move](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/move_img_to_project.png)
+
+  ![plan move](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/move_img_to_project.png)
 
 - Executing the move
-![act move](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/move_handle.png)
+
+  ![act move](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/move_handle.png)
 
 - Example Performance
 
@@ -215,4 +217,25 @@ This example demonstrates how to develop a real project using Cursor IDE, where 
 ## Compatibility
 
 - This project has been verified to work with the Cursor and Windsurf IDE MCP integration.
-- Future plans include supporting more IDEs and development environments compatible with the Model Context Protocol (MCP). 
+- Future plans include supporting more IDEs and development environments compatible with the Model Context Protocol (MCP).
+
+## API Reference
+
+### Tencent Hunyuan Image Generation API
+
+The project currently uses Tencent Hunyuan Image Generation API. Here are the key details:
+
+#### API Endpoints
+- Domain: `hunyuan.tencentcloudapi.com`
+- Region: `ap-guangzhou` (Currently only supports Guangzhou region)
+- Default API Rate Limit: 20 requests/second
+- Concurrent Tasks: Default 1 task at a time
+
+#### Task Flow
+1. Submit Task: Submit an asynchronous image generation task with text description
+2. Query Task: Get task status and results using task ID
+3. Result URL: Generated image URLs are valid for 1 hour
+  
+For detailed API documentation and pricing, please refer to:
+- [API Documentation](https://cloud.tencent.com/document/api/1729/105970)
+- [Pricing Details](https://cloud.tencent.com/document/product/1729/105925) 

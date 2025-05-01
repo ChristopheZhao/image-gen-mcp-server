@@ -132,10 +132,12 @@ python mcp_image_server.py
 提示：你无需手动将生成的图片从保存目录移动到项目目录。Cursor 会在得到你的批准后自动处理这个过程。这是使用 Cursor 的主要优势之一。
 
 - 计划移动图片
-![计划移动](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/move_img_to_project.png)
+
+  ![计划移动](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/move_img_to_project.png)
 
 - 执行移动
-![执行移动](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/move_handle.png)
+
+  ![执行移动](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/move_handle.png)
 
 - 效果展示
 
@@ -186,4 +188,25 @@ python mcp_image_server.py
 - 未来计划支持更多兼容 MCP 协议的 IDE 和开发环境。
 
 > 欢迎社区贡献更多模型适配和新功能！
+
+## API 参考
+
+### 腾讯混元生图 API
+
+本项目目前使用腾讯混元生图 API，以下是主要信息：
+
+#### API 接入点
+- 域名：`hunyuan.tencentcloudapi.com`
+- 地域：`ap-guangzhou`（目前仅支持广州地域）
+- 默认接口请求频率限制：20次/秒
+- 并发任务数：默认支持1个并发任务
+
+#### 任务流程
+1. 提交任务：提交包含文本描述的异步图像生成任务
+2. 查询任务：使用任务 ID 获取任务状态和结果
+3. 结果 URL：生成的图片 URL 有效期为1小时
+
+详细信息请参考：
+- [API 文档](https://cloud.tencent.com/document/api/1729/105970)
+- [计费说明](https://cloud.tencent.com/document/product/1729/105925)
 
