@@ -66,6 +66,7 @@ Create a `.env` file in the project root with the following content:
 ```
 TENCENT_SECRET_ID=your_tencent_secret_id
 TENCENT_SECRET_KEY=your_tencent_secret_key
+MCP_IMAGE_SAVE_DIR=your_saved_img_dir
 ```
 
 ## Usage

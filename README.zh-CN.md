@@ -64,6 +64,7 @@ pip install -r requirements.lock.txt
 ```
 TENCENT_SECRET_ID=你的腾讯云SecretId
 TENCENT_SECRET_KEY=你的腾讯云SecretKey
+MCP_IMAGE_SAVE_DIR=你的保存生成图片的位置
 ```
 
 ## 用法
