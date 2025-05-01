@@ -73,12 +73,6 @@ TENCENT_SECRET_KEY=你的腾讯云SecretKey
 ```bash
 # 直接运行脚本
 python mcp_image_server.py
-
-# 或作为包安装后运行
-hunyuan-image-mcp
-
-# 或用 MCP CLI
-mcp run mcp_image_server.py
 ```
 
 ### 连接到服务
@@ -105,57 +99,6 @@ mcp run mcp_image_server.py
    - **Type**: `stdio`
    - **Command**: Python 解释器和脚本的绝对路径
 
-#### 使用 UV 虚拟环境（推荐）
-
-**Windows:**
-1. 获取 Python 路径：
-   ```
-   echo %cd%\.venv\Scripts\python.exe
-   ```
-2. 获取脚本路径：
-   ```
-   echo %cd%\mcp_image_server.py
-   ```
-3. 在 Cursor 填写完整命令：
-   ```
-   D:\path\to\image-gen-mcp-server\.venv\Scripts\python.exe D:\path\to\image-gen-mcp-server\mcp_image_server.py
-   ```
-
-**macOS/Linux:**
-1. 获取 Python 路径：
-   ```
-   echo $(pwd)/.venv/bin/python
-   ```
-2. 获取脚本路径：
-   ```
-   echo $(pwd)/mcp_image_server.py
-   ```
-3. 在 Cursor 填写完整命令：
-   ```
-   /path/to/image-gen-mcp-server/.venv/bin/python /path/to/image-gen-mcp-server/mcp_image_server.py
-   ```
-
-#### 使用系统 Python
-
-**Windows:**
-1. 获取 Python 路径：
-   ```
-   where python
-   ```
-2. 在 Cursor 填写：
-   ```
-   C:\Users\YourName\AppData\Local\Programs\Python\Python39\python.exe D:\path\to\image-gen-mcp-server\mcp_image_server.py
-   ```
-
-**macOS/Linux:**
-1. 获取 Python 路径：
-   ```
-   which python3
-   ```
-2. 在 Cursor 填写：
-   ```
-   /usr/bin/python3 /path/to/image-gen-mcp-server/mcp_image_server.py
-   ```
 
 #### 环境变量
 
@@ -171,9 +114,36 @@ mcp run mcp_image_server.py
 3. 新建对话，输入"生成一张山水风景图"
 4. 若配置无误，AI 会调用 MCP 服务生成图片并返回URL
 
-
-
 **注意**：首次使用时，Cursor 可能会请求你批准使用该 MCP server。
+
+让我们看看在 Cursor 中的具体步骤：
+
+1. 在 Cursor 中输入生成命令：
+   ![山景图](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mountain_cursor.png)
+
+2. 在你批准后，它会调用 MCP 图像生成工具并保存：
+   ![生成的山景图](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mountain_gtips.png)
+
+3. 查看或使用保存在指定目录（MCP_IMAGE_SAVE_DIR）中的图片：
+   ![生成的山景图](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mountain_curg.jpg)
+
+你也可以让 Cursor 为你的网站设计图片 ✨。Cursor 可以使用 MCP 工具根据特定布局要求生成匹配的图片 🎨。
+
+提示：你无需手动将生成的图片从保存目录移动到项目目录。Cursor 会在得到你的批准后自动处理这个过程。这是使用 Cursor 的主要优势之一。
+
+- 计划移动图片
+![计划移动](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/move_img_to_project.png)
+
+- 执行移动
+![执行移动](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/move_handle.png)
+
+- 效果展示
+
+  原始网页设计：
+  ![设计前](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/before_design.png)
+
+  使用 Cursor 生成并移动图片后的新设计：
+  ![设计后](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/after_design.png)
 
 #### 常见问题排查
 - 检查环境变量是否正确
@@ -182,33 +152,17 @@ mcp run mcp_image_server.py
 - 可直接运行服务端脚本排查报错
 - 检查 UV 环境 `uv --version`
 
-### 示例
 
-使用 `generate_image` 工具：
 
-```python
-result = await generate_image(
-    prompt="一幅美丽的山水风景，有湖泊和树林",
-    style="xieshi",  # 写实风格
-    resolution="1792:1024",  # 16:9 横向
-    negative_prompt="模糊，低质量"
-)
-```
 
-#### Cursor通过MCP调用文生图工具病保存图片
-![山景图](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mh_zh.png)
-
-![生成的山景图](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/img_1746021010.jpg)
-
-你也可以让 Cursor 为你的网站设计图片。Cursor 可以使用 MCP 工具根据特定布局要求生成匹配的图片。
-
-![设计前](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/before_design.png)
-
-![设计后](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/after_design.png) 
 
 ## 前端演示
 
-前端集成示例见 [`web-design-demo/`](web-design-demo/)。
+查看前端集成示例请访问 [`web-design-demo/`](web-design-demo/)。
+这个示例展示了如何使用 Cursor IDE 开发实际项目，您可以直接在开发环境中使用我们的 MCP 工具生成和管理图片 🛠️。无需在不同的图片生成工具之间切换或离开 IDE - 所有操作都可以在您的开发工作流程中完成 ✨。
+
+- 演示网站截图
+![网站演示截图](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/webdemo.png)
 
 ## 许可证
 
@@ -228,7 +182,7 @@ result = await generate_image(
 
 ## 兼容性
 
-- 本项目已在 Cursor IDE 的 MCP 集成环境下验证可用。
+- 本项目已在 Cursor 和 Windsurf IDE 的 MCP 集成环境下验证可用。
 - 未来计划支持更多兼容 MCP 协议的 IDE 和开发环境。
 
 > 欢迎社区贡献更多模型适配和新功能！

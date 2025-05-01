@@ -78,16 +78,11 @@ You can run the MCP server as follows:
 # Directly run the script
 python mcp_image_server.py
 
-# Or if installed as a package
-hunyuan-image-mcp
-
-# Or use the MCP CLI
-mcp run mcp_image_server.py
 ```
 
 ### Connecting to the Server
 
-You can connect from any MCP-compatible client. The server provides the following features:
+You can connect from MCP-compatible client(recommand cursor now). The server provides the following features:
 
 #### Resources
 - `styles://list` - List all available image styles
@@ -111,57 +106,23 @@ To add this MCP server in Cursor:
    - **Type**: `stdio`
    - **Command**: Full command, must include the absolute path to Python and the script
 
-#### Using UV Environment (Recommended)
-
-**Windows:**
-1. Get the Python interpreter path:
-   ```
-   echo %cd%\.venv\Scripts\python.exe
-   ```
-2. Get the script path:
-   ```
-   echo %cd%\mcp_image_server.py
-   ```
-3. In Cursor, enter the full command:
-   ```
-   D:\path\to\image-gen-mcp-server\.venv\Scripts\python.exe D:\path\to\image-gen-mcp-server\mcp_image_server.py
-   ```
-
-**macOS/Linux:**
-1. Get the Python interpreter path:
-   ```
-   echo $(pwd)/.venv/bin/python
-   ```
-2. Get the script path:
-   ```
-   echo $(pwd)/mcp_image_server.py
-   ```
-3. In Cursor, enter the full command:
-   ```
-   /path/to/image-gen-mcp-server/.venv/bin/python /path/to/image-gen-mcp-server/mcp_image_server.py
-   ```
-
-#### Using System Python
-
-**Windows:**
-1. Get Python path:
-   ```
-   where python
-   ```
-2. In Cursor, enter:
-   ```
-   C:\Users\YourName\AppData\Local\Programs\Python\Python39\python.exe D:\path\to\image-gen-mcp-server\mcp_image_server.py
-   ```
-
-**macOS/Linux:**
-1. Get Python path:
-   ```
-   which python3
-   ```
-2. In Cursor, enter:
-   ```
-   /usr/bin/python3 /path/to/image-gen-mcp-server/mcp_image_server.py
-   ```
+mcp.json format:
+```json
+{
+  "mcpServers": {
+    "image-generation": {
+      "name": "image-generation service",
+      "description": "support the image generation service using tencent hunyuan API",
+      "type": "stdio",
+      "command": "D:\\your_path\\image-gen-mcp-server\\.venv\\Scripts\\python.exe",
+      "args": ["D:\\your_path\\image-gen-mcp-server\\mcp_image_server.py"],
+      "environment": ["TENCENT_SECRET_ID", "TENCENT_SECRET_KEY","MCP_IMAGE_SAVE_DIR"],
+      "autoRestart": true,
+      "startupTimeoutMs": 30000
+    }
+  }
+} 
+```
 
 #### Environment Variables
 
@@ -175,20 +136,43 @@ When configuring the MCP server in Cursor, set the following environment variabl
 1. Save the configuration
 2. Restart Cursor
 3. Start a new chat and enter: "Generate a mountain landscape image"
-4. If everything is set up, the AI will use your MCP server to generate the image
+4. If everything is set up correctly, the AI will use your MCP server to generate the image
 
 **Note:** The first time you use it, Cursor may ask for permission to use this MCP server.
 
-#### Image generated in Cursor by MCP and saved
-![Mountain Landscape](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mh_eng.png)
+Let's look at the steps in Cursor:
 
-![Generated Mountain Image](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/img_1746021141.jpg)
+- step_1: types your generate command in cursor
 
-You can also ask Cursor to design images for your website. Cursor can use the MCP tool to generate images that match your requirements for specific layouts.
+  ![Mountain Landscape](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mountain_cursor.png)
 
-![Before Design](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/before_design.png)
+- step_2: after your approval it will call the mcp image-gen tool and save it
 
-![After Design](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/after_design.png)
+  ![Mountain Landscape](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mountain_gtips.png)
+
+
+- Step 3: View or use the image saved in the directory (MCP_IMAGE_SAVE_DIR) you have set in the .env file
+
+  ![Generated Mountain Image](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mountain_curg.jpg)
+
+
+You can also ask Cursor to design images for your website ✨. Cursor can use the MCP tool to generate images that match your specific layout requirements 🎨. Perfect for creating beautiful web designs! 
+
+Tip: You don't need to manually move the generated images from the save directory to your project directory. Cursor will handle this automatically after your approval. This is one of the main advantages of using Cursor.
+
+- Planning the move 
+![plan move](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/move_img_to_project.png)
+
+- Executing the move
+![act move](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/move_handle.png)
+
+- Example Performance
+
+  Original web design:
+  ![Before Design](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/before_design.png)
+
+  New design after generating and moving the image to the project using Cursor:
+  ![After Design](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/after_design.png)
 
 
 
@@ -199,23 +183,16 @@ You can also ask Cursor to design images for your website. Cursor can use the MC
 - Try running the server script directly to check for errors
 - Check UV environment with `uv --version`
 
-### Examples
-
-Using the `generate_image` tool:
-
-```python
-result = await generate_image(
-    prompt="A beautiful mountain landscape with a lake and trees",
-    style="xieshi",  # Realistic style
-    resolution="1792:1024",  # 16:9 landscape
-    negative_prompt="blurry, low quality"
-)
-```
-
-
 ## Front-end Demo
 
 For a front-end integration example, see [`web-design-demo/`](web-design-demo/).
+This example demonstrates how to develop a real project using Cursor IDE, where you can generate and manage images directly within your development environment using our MCP tool 🛠️. No need to switch between different image generation tools or leave your IDE - everything can be done right in your development workflow ✨.
+
+- screenshot of the demo web
+![web demo screenshot](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/webdemo.png)
+
+
+
 
 ## License
 
@@ -237,5 +214,5 @@ For a front-end integration example, see [`web-design-demo/`](web-design-demo/).
 
 ## Compatibility
 
-- This project has been verified to work with the Cursor IDE MCP integration.
+- This project has been verified to work with the Cursor and Windsurf IDE MCP integration.
 - Future plans include supporting more IDEs and development environments compatible with the Model Context Protocol (MCP). 

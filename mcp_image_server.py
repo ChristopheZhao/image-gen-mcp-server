@@ -1,6 +1,6 @@
 import os
 import base64
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Annotated
 import asyncio
 import json
 import sys
@@ -12,6 +12,7 @@ from mcp.types import TextContent, ImageContent
 from image_generation_tool import ImageGenerationTool
 
 from dotenv import load_dotenv
+from pydantic import Field
 
 load_dotenv()
 
@@ -109,19 +110,19 @@ available_resolutions_list = format_options(AVAILABLE_RESOLUTIONS)
 
 @mcp.tool()
 async def generate_image(
-    prompt: str,
-    style: str = "riman",
-    resolution: str = "1024:1024",
-    negative_prompt: str = "",
-    file_prefix: str = ""
+    prompt: Annotated[str, Field(description="Image description text")],
+    style: Annotated[str, Field(description="Image style. Choices: riman, xieshi, monai, shuimo, bianping, xiangsu, ertonghuiben, 3dxuanran, manhua, heibaimanhua, dongman, bijiasuo, saibopengke, youhua, masaike, qinghuaci, xinnianjianzhi, xinnianhuayi")]="riman",
+    resolution: Annotated[str, Field(description="Image resolution. Choices: 768:768, 768:1024, 1024:768, 1024:1024, 720:1280, 1280:720, 768:1280, 1280:768")]="1024:1024",
+    negative_prompt: Annotated[str, Field(description="Negative prompt, describes content you don't want in the image")] = "",
+    file_prefix: Annotated[str, Field(description="Optional prefix for the output filename (English only)")] = ""
 ):
     f"""
     Generate image based on prompt
 
     Args:
         prompt: Image description text
-        style: Image style. Must be one of: {available_styles_list}
-        resolution: Image resolution. Must be one of: {available_resolutions_list}
+        style: Image style. Must be one of the key in the available_styles_list: {available_styles_list}
+        resolution: Image resolution. Must be one of the key in the available_resolutions_list: {available_resolutions_list}
         negative_prompt: Negative prompt, describes content you don't want in the image
         file_prefix: Optional prefix for the output filename (English only)
     """
@@ -136,12 +137,13 @@ async def generate_image(
     except Exception as e:
         debug_print(f"[ERROR] Failed to convert input parameters to JSON: {e}")
     
-    if style not in AVAILABLE_STYLES:
+    if style not in AVAILABLE_STYLES.keys():
+        debug_print(f"AVAILABLE_STYLES.keys() = {AVAILABLE_STYLES.keys()}")
         debug_print(f"Error: Invalid style {style}")
-        error_text = f"Error: Invalid style: {style}, please use styles://list to see available styles"
+        error_text = f"Error: Invalid style: {style},Available styles: {AVAILABLE_STYLES.keys()}, please use styles://list to see available styles"
         return [TextContent(type="text", text=error_text)]
         
-    if resolution not in AVAILABLE_RESOLUTIONS:
+    if resolution not in AVAILABLE_RESOLUTIONS.keys():
         debug_print(f"Error: Invalid resolution {resolution}")
         error_text = f"Error: Invalid resolution: {resolution}, please use resolutions://list to see available resolutions"
         return [TextContent(type="text", text=error_text)]

@@ -6,6 +6,7 @@ from typing import Dict, Any
 from dotenv import load_dotenv
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+import pprint
 
 # Load environment variables
 load_dotenv()
@@ -23,7 +24,7 @@ async def generate_and_save_image(prompt: str, style: str = "xieshi", resolution
     Returns:
         bool: 是否成功生成并保存图像
     """
-    print(f"启动图像生成: prompt={prompt}, style={style}, resolution={resolution}")
+    print(f"Starting image generation: prompt={prompt}, style={style}, resolution={resolution}")
     
     # 设置服务器参数
     server_params = StdioServerParameters(
@@ -37,23 +38,42 @@ async def generate_and_save_image(prompt: str, style: str = "xieshi", resolution
     )
     
     # 连接到MCP服务器
-    print("连接到MCP服务器...")
+    print("Connecting to MCP server...")
     async with stdio_client(server_params) as (read, write):
         async with ClientSession(read, write) as session:
             # 初始化连接
             await session.initialize()
-            print("成功连接到MCP图像生成服务器")
+            print("Successfully connected to MCP image generation server")
             
             # 列出可用资源
-            print("\n查询可用风格...")
+            print("\nQuerying available styles...")
             styles_response = await session.read_resource("styles://list")
             if hasattr(styles_response, 'contents') and styles_response.contents:
-                print(f"可用风格: \n{styles_response.contents[0].text}")
+                styles_dict = json.loads(styles_response.contents[0].text)
+                print("Available styles:")
+                pprint.pprint(styles_dict)
             
-            print("\n查询可用分辨率...")
+            print("\nQuerying available resolutions...")
             resolutions_response = await session.read_resource("resolutions://list")
             if hasattr(resolutions_response, 'contents') and resolutions_response.contents:
-                print(f"可用分辨率: \n{resolutions_response.contents[0].text}")
+                resolutions_dict = json.loads(resolutions_response.contents[0].text)
+                print("Available resolutions:")
+                pprint.pprint(resolutions_dict)
+            
+            # List available tools
+            print("\nQuerying available tools...")
+            try:
+                tools = await session.list_tools()
+                print("Available tools:")
+                for tool in tools:
+                    print('tool = ', tool)
+                    # print(f"- {tool['name']}: {tool.get('description', '')}")
+                    # if 'parameters' in tool:
+                    #     print("  Parameters:")
+                    #     for param, param_info in tool['parameters'].items():
+                    #         print(f"    {param}: {param_info}")
+            except Exception as e:
+                print(f"Failed to list tools: {e}")
             
             # 设置一个定时打印任务，每10秒打印一次进度提醒
             progress_task = None
@@ -62,11 +82,11 @@ async def generate_and_save_image(prompt: str, style: str = "xieshi", resolution
                 count = 0
                 while True:
                     count += 1
-                    print(f"[客户端进度] 等待服务器响应... 已等待 {count*10} 秒")
+                    print(f"[Client Progress] Waiting for server response... waited {count*10} seconds")
                     await asyncio.sleep(10)
             
             # 生成图像
-            print("\n开始生成图像，这可能需要几分钟时间...")
+            print("\nStarting image generation, this may take a few minutes...")
             try:
                 # 启动进度打印任务
                 progress_task = asyncio.create_task(print_client_progress())
@@ -89,48 +109,31 @@ async def generate_and_save_image(prompt: str, style: str = "xieshi", resolution
                 if progress_task and not progress_task.done():
                     progress_task.cancel()
                 
-                print(f"收到服务器响应")
+                print("Received response from server")
                 
                 # 处理结果
                 if hasattr(result, 'content') and result.content:
                     content_item = result.content[0]
-                    print(f"内容项类型: {type(content_item)}")
+                    print(f"Content item type: {type(content_item)}")
                     
                     # 处理文本内容类型
                     if hasattr(content_item, 'text'):
                         text = content_item.text
-                        print(f"文本内容: {text[:100]}..." if len(text) > 100 else text)
-                        
-                        # 尝试解析JSON
-                        try:
-                            json_data = json.loads(text)
-                            
-                            # 检查是否有错误
-                            if "error" in json_data:
-                                print(f"服务器返回错误: {json_data['error']}")
-                                return False
-                                
-                            # 检查是否有内容
-                            if "content" in json_data:
-                                # 保存base64编码的图像
-                                image_data = base64.b64decode(json_data["content"])
-                                filename = f"generated_{style}_{resolution.replace(':', 'x')}.jpg"
-                                
-                                with open(filename, "wb") as f:
-                                    f.write(image_data)
-                                    
-                                print(f"图像成功保存为 '{filename}'")
-                                return True
-                        except json.JSONDecodeError:
-                            print(f"无法解析JSON: {text[:50]}...")
-                            
+                        print(f"Server response: {text}")
+                        # 判断是否包含图片保存路径
+                        if "saved to:" in text:
+                            print("Image has been saved by the server. No need to save on client side.")
+                            return True
+                        else:
+                            print("Server response does not contain image save path.")
+                            return False
                     # 处理字典类型
                     elif hasattr(content_item, 'keys') or hasattr(content_item, '__getitem__'):
-                        print(f"字典内容: {content_item}")
+                        print(f"Dictionary content: {content_item}")
                         
                         # 检查是否有错误
                         if "error" in content_item:
-                            print(f"服务器返回错误: {content_item['error']}")
+                            print(f"Server returned error: {content_item['error']}")
                             return False
                             
                         # 检查是否有内容
@@ -142,17 +145,17 @@ async def generate_and_save_image(prompt: str, style: str = "xieshi", resolution
                             with open(filename, "wb") as f:
                                 f.write(image_data)
                                 
-                            print(f"图像成功保存为 '{filename}'")
+                            print(f"Image successfully saved as '{filename}'")
                             return True
                 else:
-                    print("服务器未返回内容")
+                    print("No content returned from server")
                 
             except asyncio.TimeoutError:
-                print("图像生成超时，请稍后重试")
+                print("Image generation timed out, please try again later")
                 return False
             except Exception as e:
                 import traceback
-                print(f"图像生成过程中发生异常: {e}")
+                print(f"Exception occurred during image generation: {e}")
                 print(traceback.format_exc())
                 return False
             finally:
@@ -160,7 +163,7 @@ async def generate_and_save_image(prompt: str, style: str = "xieshi", resolution
                 if progress_task and not progress_task.done():
                     progress_task.cancel()
     
-    print("未能生成图像")
+    print("Image generation was not successful")
     return False
 
 async def main():
@@ -178,9 +181,9 @@ async def main():
     )
     
     if success:
-        print("图像生成过程成功完成")
+        print("Image generation process completed successfully")
     else:
-        print("图像生成过程未成功完成")
+        print("Image generation process was not successful")
 
 if __name__ == "__main__":
     asyncio.run(main()) 
