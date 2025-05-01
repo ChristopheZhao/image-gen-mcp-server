@@ -76,6 +76,11 @@ MCP_IMAGE_SAVE_DIR=你的保存生成图片的位置
 python mcp_image_server.py
 ```
 
+MCP 服务器成功运行截图：
+
+![MCP 服务器运行](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mcp_server_runsuc.png)
+
+
 ### 连接到服务
 
 你可以用任何兼容 MCP 协议的客户端连接本服务。服务端提供如下功能：
@@ -151,6 +156,7 @@ python mcp_image_server.py
   使用 Cursor 生成并移动图片后的新设计：
   ![设计后](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/after_design.png)
 
+
 #### 常见问题排查
 - 检查环境变量是否正确
 - 路径有空格时请加引号
@@ -213,6 +219,17 @@ python mcp_image_server.py
 ## 兼容性
 
 - 本项目已在 Cursor 和 Windsurf IDE 的 MCP 集成环境下验证可用。
+
+  - Windsurf IDE 现已支持集成
+
+    - Windsurf 中调用 MCP 工具的截图
+
+    ![Windsurf 运行界面](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/windsurf_inte.png)
+
+    - 生成结果如下
+
+    ![Windsurf 调用结果](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/img_1746070231.jpg)
+
 - 未来计划支持更多兼容 MCP 协议的 IDE 和开发环境。
 
 ## 致谢
@@ -246,5 +263,4 @@ python mcp_image_server.py
 请确保适当更新测试，并遵循现有的代码风格。
 
 > 感谢您对改进这个项目的关注！
-
 

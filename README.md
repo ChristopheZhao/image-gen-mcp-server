@@ -81,6 +81,10 @@ python mcp_image_server.py
 
 ```
 
+Screenshot of MCP server running successfully:
+
+![MCP Server Running](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mcp_server_runsuc.png)
+
 ### Connecting to the Server
 
 You can connect from MCP-compatible client(recommand cursor now). The server provides the following features:
@@ -178,8 +182,7 @@ Tip: You don't need to manually move the generated images from the save director
   ![After Design](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/after_design.png)
 
 
-
-#### Troubleshooting
+### Troubleshooting
 - Ensure environment variables are set correctly
 - Check for spaces in paths; use quotes if needed
 - Ensure the virtual environment is activated (if using one)
@@ -239,7 +242,19 @@ For detailed API documentation and pricing, please refer to:
 ## Compatibility
 
 - This project has been verified to work with the Cursor and Windsurf IDE MCP integration.
+
+  - windsurf is also supported to integrated now
+
+    - screenshot of mcp tool call in windsurf
+
+    - ![windsurf run interface](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/windsurf_inte.png)
+
+    - and the result as follows
+
+    - ![windsurf call result](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/img_1746070231.jpg)
+
 - Future plans include supporting more IDEs and development environments compatible with the Model Context Protocol (MCP).
+
 
 ## Acknowledgments
 
