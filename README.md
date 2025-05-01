@@ -194,31 +194,6 @@ This example demonstrates how to develop a real project using Cursor IDE, where 
 ![web demo screenshot](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/webdemo.png)
 
 
-
-
-## License
-
-[MIT License](LICENSE)
-
-## RoadMap
-
-- **Current Version**
-  - Only supports Tencent Hunyuan image generation API
-
-- **Future Plans**
-  - Support more mainstream text-to-image model APIs, including:
-    - OpenAI GPT-4o / gpt-image-1
-    - Alibaba Tongyi Wanxiang
-    - Baidu ERNIE-ViLG
-  - Select backend model via environment variable for flexible switching and extension
-
-> Community contributions for more model integrations and new features are welcome!
-
-## Compatibility
-
-- This project has been verified to work with the Cursor and Windsurf IDE MCP integration.
-- Future plans include supporting more IDEs and development environments compatible with the Model Context Protocol (MCP).
-
 ## API Reference
 
 ### Tencent Hunyuan Image Generation API
@@ -239,3 +214,62 @@ The project currently uses Tencent Hunyuan Image Generation API. Here are the ke
 For detailed API documentation and pricing, please refer to:
 - [API Documentation](https://cloud.tencent.com/document/api/1729/105970)
 - [Pricing Details](https://cloud.tencent.com/document/product/1729/105925) 
+
+
+## License
+
+[MIT License](LICENSE)
+
+## RoadMap
+
+- **Current Version**
+  - Only supports Tencent Hunyuan image generation API
+
+- **Future Plans**
+  - Support more mainstream text-to-image model APIs, including:
+    - OpenAI GPT-4o / gpt-image-1
+    - Alibaba Tongyi Wanxiang
+    - Baidu ERNIE-ViLG
+  - Select backend model via environment variable for flexible switching and extension
+
+> Community contributions for more model integrations and new features are welcome!
+
+
+## Compatibility
+
+- This project has been verified to work with the Cursor and Windsurf IDE MCP integration.
+- Future plans include supporting more IDEs and development environments compatible with the Model Context Protocol (MCP).
+
+## Acknowledgments
+
+This project is built with [FastMCP](https://github.com/jlowin/fastmcp) as the core framework, a powerful implementation of the Model Context Protocol. The MCP integration is based on:
+- [FastMCP](https://github.com/jlowin/fastmcp): A fast, Pythonic way to build MCP servers
+- [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk): The official Python SDK for Model Context Protocol
+
+We also use these excellent open-source projects:
+- [UV](https://github.com/astral-sh/uv): A fast Python package installer and resolver
+- [Python-dotenv](https://github.com/theskumar/python-dotenv): Reads key-value pairs from .env file
+- [Tencentcloud-sdk-python](https://github.com/TencentCloud/tencentcloud-sdk-python): Official Tencent Cloud SDK for Python
+
+## Contributing
+
+We welcome contributions of all kinds! Here are some ways you can help:
+
+- 🐛 Report bugs and issues
+- 💡 Suggest new features or improvements
+- 🔧 Submit pull requests
+- 🎨 Add support for more image generation models
+
+### Getting Started with Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'feat: add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+Please make sure to update tests as appropriate and follow the existing coding style.
+
+> We appreciate your interest in making this project better!
+
+

@@ -119,12 +119,15 @@ python mcp_image_server.py
 让我们看看在 Cursor 中的具体步骤：
 
 1. 在 Cursor 中输入生成命令：
+
    ![山景图](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mountain_cursor.png)
 
 2. 在你批准后，它会调用 MCP 图像生成工具并保存：
+
    ![生成的山景图](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mountain_gtips.png)
 
 3. 查看或使用保存在指定目录（MCP_IMAGE_SAVE_DIR）中的图片：
+
    ![生成的山景图](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mountain_curg.jpg)
 
 你也可以让 Cursor 为你的网站设计图片 ✨。Cursor 可以使用 MCP 工具根据特定布局要求生成匹配的图片 🎨。
@@ -166,28 +169,6 @@ python mcp_image_server.py
 - 演示网站截图
 ![网站演示截图](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/webdemo.png)
 
-## 许可证
-
-[MIT License](LICENSE)
-
-## 路线图（RoadMap）
-
-- **当前版本**
-  - 仅支持腾讯混元（Hunyuan）图像生成 API
-
-- **未来计划**
-  - 支持更多主流文生图模型 API，包括：
-    - OpenAI GPT-4o / gpt-image-1
-    - 阿里通义万相
-    - 百度文心一格（ERNIE-ViLG）
-  - 通过环境变量配置选择后端模型，便于灵活切换和扩展
-
-## 兼容性
-
-- 本项目已在 Cursor 和 Windsurf IDE 的 MCP 集成环境下验证可用。
-- 未来计划支持更多兼容 MCP 协议的 IDE 和开发环境。
-
-> 欢迎社区贡献更多模型适配和新功能！
 
 ## API 参考
 
@@ -209,4 +190,60 @@ python mcp_image_server.py
 详细信息请参考：
 - [API 文档](https://cloud.tencent.com/document/api/1729/105970)
 - [计费说明](https://cloud.tencent.com/document/product/1729/105925)
+
+
+
+## 许可证
+
+[MIT License](LICENSE)
+
+## RoadMap
+
+- **当前版本**
+  - 仅支持腾讯混元（Hunyuan）图像生成 API
+
+- **未来计划**
+  - 支持更多主流文生图模型 API，包括：
+    - OpenAI GPT-4o / gpt-image-1
+    - 阿里通义万相
+    - 百度文心一格（ERNIE-ViLG）
+  - 通过环境变量配置选择后端模型，便于灵活切换和扩展
+
+## 兼容性
+
+- 本项目已在 Cursor 和 Windsurf IDE 的 MCP 集成环境下验证可用。
+- 未来计划支持更多兼容 MCP 协议的 IDE 和开发环境。
+
+## 致谢
+
+本项目以 [FastMCP](https://github.com/jlowin/fastmcp) 作为核心框架构建，这是一个强大的 Model Context Protocol 实现。MCP 集成基于：
+- [FastMCP](https://github.com/jlowin/fastmcp)：一个快速、Pythonic 的 MCP 服务器构建框架
+- [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)：Model Context Protocol 的官方 Python SDK
+
+我们同时使用了以下优秀的开源项目：
+- [UV](https://github.com/astral-sh/uv)：快速的 Python 包安装和解析工具
+- [Python-dotenv](https://github.com/theskumar/python-dotenv)：用于读取 .env 文件的键值对
+- [Tencentcloud-sdk-python](https://github.com/TencentCloud/tencentcloud-sdk-python)：腾讯云官方 Python SDK
+
+## 参与贡献
+
+我们欢迎各种形式的贡献！以下是您可以帮助的方式：
+
+- 🐛 报告 bug 和问题
+- 💡 提出新功能或改进建议
+- 🔧 提交代码改进
+- 🎨 添加更多图像生成模型支持
+
+### 如何开始贡献
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'feat: add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 创建 Pull Request
+
+请确保适当更新测试，并遵循现有的代码风格。
+
+> 感谢您对改进这个项目的关注！
+
 
