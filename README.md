@@ -1,13 +1,27 @@
 # MCP Image Generation Server
 
-A Model Context Protocol (MCP) server for image generation using Tencent Hunyuan API.
+A Model Context Protocol (MCP) server for image generation using multiple AI providers including Tencent Hunyuan, OpenAI DALL-E 3, and Doubao APIs.
 
 ## Features
 
+### 🎯 Multi-API Provider Support
+- **Tencent Hunyuan**: 18 artistic styles with Chinese optimization
+- **OpenAI DALL-E 3**: High-quality image generation with English optimization
+- **Doubao (ByteDance)**: Balanced quality and speed with 12 styles
+
+### 🚀 Core Features
 - Generate images from text descriptions
-- Support for multiple image styles
+- Support for multiple image styles across different providers
 - Support for different image resolutions
 - Negative prompts for excluding unwanted elements
+- Intelligent provider selection and management
+- Unified parameter format with provider-specific options
+
+### 🔧 Smart Provider Management
+- Automatic detection of available API providers
+- Support for specifying particular providers or automatic selection
+- Unified error handling and retry mechanisms
+- Flexible parameter formats: `provider:style` and `provider:resolution`
 
 ## Installation
 
@@ -71,14 +85,34 @@ MCP_IMAGE_SAVE_DIR=your_saved_img_dir
 
 ## Usage
 
+### 🔄 Choosing Your Server Version
+
+This project offers two server implementations:
+
+#### Single API Server (Original)
+```bash
+# For Tencent Hunyuan API only
+python mcp_image_server.py
+```
+
+#### Multi-API Server (New - Recommended)
+```bash
+# Supports Tencent Hunyuan, OpenAI DALL-E 3, and Doubao APIs
+python mcp_image_server_multi.py
+```
+
+**Recommendation**: Use the multi-API server (`mcp_image_server_multi.py`) for access to all supported providers and enhanced features.
+
 ### Running the MCP Server
 
 You can run the MCP server as follows:
 
 ```bash
-# Directly run the script
-python mcp_image_server.py
+# Multi-API server (recommended)
+python mcp_image_server_multi.py
 
+# Or original single-API server
+python mcp_image_server.py
 ```
 
 Screenshot of MCP server running successfully:
@@ -99,6 +133,63 @@ You can connect from MCP-compatible client(recommand cursor now). The server pro
 #### Prompts
 - `image_generation_prompt` - Create image generation prompt templates
 
+### 🎨 Multi-API Usage Examples
+
+#### Basic Usage
+```python
+# Auto-select best available provider
+generate_image(prompt="A cute cat in a garden")
+
+# Specify a particular provider
+generate_image(prompt="A cute cat", provider="openai")
+generate_image(prompt="一只可爱的小猫", provider="hunyuan")
+generate_image(prompt="Cute kitten", provider="doubao")
+```
+
+#### Advanced Parameter Usage
+```python
+# Use provider-specific styles and resolutions
+generate_image(
+    prompt="Cyberpunk city skyline", 
+    style="hunyuan:saibopengke", 
+    resolution="hunyuan:1024:768"
+)
+
+# Mix provider selection with standard parameters
+generate_image(
+    prompt="Fantasy magical forest",
+    provider="doubao",
+    style="fantasy",
+    resolution="1024x768",
+    negative_prompt="low quality, blurry"
+)
+
+# OpenAI with high-resolution output
+generate_image(
+    prompt="Artistic portrait of a musician",
+    provider="openai",
+    style="artistic",
+    resolution="1792x1024"
+)
+```
+
+### 📊 Supported Providers and Parameters
+
+#### Tencent Hunyuan
+- **Styles**: 18 options including `riman`, `xieshi`, `shuimo`, `saibopengke`, `youhua`
+- **Resolutions**: 8 options from `768:768` to `1280:720`
+- **Specialty**: Chinese-optimized, rich artistic styles
+
+#### OpenAI DALL-E 3
+- **Styles**: 12 options including `natural`, `vivid`, `realistic`, `artistic`, `anime`
+- **Resolutions**: 7 options including ultra-high resolution `1792x1024`
+- **Specialty**: High-quality output, English optimization
+
+#### Doubao (ByteDance)
+- **Styles**: 12 options including `general`, `anime`, `chinese_painting`, `cyberpunk`
+- **Resolutions**: 9 options from `512x512` to `1024x576`
+- **Specialty**: Balanced quality and speed
+
 ### Cursor Integration
 
 To add this MCP server in Cursor:
@@ -107,11 +198,11 @@ To add this MCP server in Cursor:
 2. Go to Settings > Features > MCP
 3. Click "+ Add New MCP Server"
 4. Fill in the configuration:
-   - **Name**: `Image Generator` (or any descriptive name)
+   - **Name**: `Multi-API Image Generator` (or any descriptive name)
    - **Type**: `stdio`
    - **Command**: Full command, must include the absolute path to Python and the script
 
-mcp.json format:
+#### Single API Configuration (Original)
 ```json
 {
   "mcpServers": {
@@ -129,12 +220,73 @@ mcp.json format:
 } 
 ```
 
+#### Multi-API Configuration (Recommended)
+```json
+{
+  "mcpServers": {
+    "multi-image-generation": {
+      "name": "Multi-API Image Generation Service",
+      "description": "Multi-provider image generation using Hunyuan, OpenAI, and Doubao APIs",
+      "type": "stdio",
+      "command": "D:\\your_path\\image-gen-mcp-server\\.venv\\Scripts\\python.exe",
+      "args": ["D:\\your_path\\image-gen-mcp-server\\mcp_image_server_multi.py"],
+      "environment": [
+        "TENCENT_SECRET_ID", 
+        "TENCENT_SECRET_KEY",
+        "OPENAI_API_KEY",
+        "DOUBAO_ACCESS_KEY",
+        "DOUBAO_SECRET_KEY",
+        "MCP_IMAGE_SAVE_DIR"
+      ],
+      "autoRestart": true,
+      "startupTimeoutMs": 30000
+    }
+  }
+}
+```
+
 #### Environment Variables
 
 When configuring the MCP server in Cursor, set the following environment variables:
+
+**For Single API (Hunyuan only)**:
 - `TENCENT_SECRET_ID`: Your Tencent Cloud API Secret ID
 - `TENCENT_SECRET_KEY`: Your Tencent Cloud API Secret Key
-- `MCP_IMAGE_SAVE_DIR`: Yur save image dir,e.g.: D:\data\mcp_img
+- `MCP_IMAGE_SAVE_DIR`: Your save image dir, e.g.: D:\data\mcp_img
+
+**For Multi-API (All providers)**:
+- `TENCENT_SECRET_ID`: Your Tencent Cloud API Secret ID
+- `TENCENT_SECRET_KEY`: Your Tencent Cloud API Secret Key
+- `OPENAI_API_KEY`: Your OpenAI API Key
+- `DOUBAO_ACCESS_KEY`: Your Doubao Access Key
+- `DOUBAO_SECRET_KEY`: Your Doubao Secret Key
+- `MCP_IMAGE_SAVE_DIR`: Your save image dir, e.g.: D:\data\mcp_img
+- `OPENAI_BASE_URL`: (Optional) Custom OpenAI endpoint
+- `DOUBAO_ENDPOINT`: (Optional) Custom Doubao endpoint
+
+**Note**: You only need to configure the API keys for the providers you want to use. The system will automatically detect available providers.
+
+### 🎯 Multi-API Usage in Cursor
+
+With the multi-API server, you can use natural language in Cursor to specify different providers:
+
+```
+# Auto-select the best provider
+"Generate a cyberpunk city image"
+
+# Specify a particular provider
+"Use OpenAI to generate a cartoon-style cat image"
+"Please use Hunyuan to create a traditional Chinese painting"
+"Generate with Doubao a fantasy-style forest scene"
+
+# Use provider-specific styles
+"Create an image with hunyuan:shuimo style showing mountains and rivers"
+"Generate a doubao:chinese_painting style landscape"
+
+# Mix parameters
+"Use OpenAI to generate a 1792x1024 artistic portrait"
+"Create a hunyuan:saibopengke style image at 1024:768 resolution"
+```
 
 #### Verification
 
@@ -200,9 +352,28 @@ This example demonstrates how to develop a real project using Cursor IDE, where 
 
 ## API Reference
 
+### Multi-API Architecture
+
+The project now supports multiple image generation APIs through a unified interface:
+
+#### Supported APIs
+1. **Tencent Hunyuan Image Generation API** (Original)
+2. **OpenAI DALL-E 3 API** (New)
+3. **Doubao Image Generation API** (New)
+
+#### Unified MCP Resources
+- `providers://list` - List all available providers
+- `styles://list` - List all styles from all providers
+- `resolutions://list` - List all resolutions from all providers
+- `styles://provider/{provider_name}` - Get styles for specific provider
+- `resolutions://provider/{provider_name}` - Get resolutions for specific provider
+
+#### Enhanced MCP Tools
+- `generate_image` - Multi-provider image generation with intelligent routing
+
 ### Tencent Hunyuan Image Generation API
 
-The project currently uses Tencent Hunyuan Image Generation API. Here are the key details:
+The project originally used and continues to support Tencent Hunyuan Image Generation API. Here are the key details:
 
 #### API Endpoints
 - Domain: `hunyuan.tencentcloudapi.com`
@@ -219,25 +390,48 @@ For detailed API documentation and pricing, please refer to:
 - [API Documentation](https://cloud.tencent.com/document/api/1729/105970)
 - [Pricing Details](https://cloud.tencent.com/document/product/1729/105925) 
 
+### OpenAI DALL-E 3 API
 
-## License
+#### API Features
+- High-quality image generation
+- Automatic prompt optimization
+- Multiple style options
+- High-resolution output support
 
-[MIT License](LICENSE)
+### Doubao API (ByteDance)
+
+#### API Features
+- ByteDance's proprietary image generation model
+- Balanced quality and speed
+- Chinese and English prompt support
+- Multiple artistic styles
 
 ## RoadMap
 
 - **Current Version**
-  - Only supports Tencent Hunyuan image generation API
+  - ✅ Tencent Hunyuan image generation API
+  - ✅ OpenAI DALL-E 3 API integration
+  - ✅ Doubao API integration
+  - ✅ Multi-provider management system
+  - ✅ Intelligent provider selection
+  - ✅ Unified parameter interface
 
 - **Future Plans**
   - Support more mainstream text-to-image model APIs, including:
-    - OpenAI GPT-4o / gpt-image-1
     - Alibaba Tongyi Wanxiang
     - Baidu ERNIE-ViLG
-  - Select backend model via environment variable for flexible switching and extension
+    - Stable Diffusion API
+  - Advanced features:
+    - Image editing and modification
+    - Batch image generation
+    - Style transfer capabilities
+    - Custom model fine-tuning support
+  - Enhanced MCP integration:
+    - Real-time generation progress
+    - Image history and management
+    - Advanced prompt templates
 
 > Community contributions for more model integrations and new features are welcome!
-
 
 ## Compatibility
 
@@ -254,7 +448,6 @@ For detailed API documentation and pricing, please refer to:
     - ![windsurf call result](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/img_1746070231.jpg)
 
 - Future plans include supporting more IDEs and development environments compatible with the Model Context Protocol (MCP).
-
 
 ## Acknowledgments
 
