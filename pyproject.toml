@@ -14,10 +14,12 @@ dependencies = [
     "aiohttp>=3.8.0",
     "python-dotenv>=0.19.0",
     "mcp>=1.6.0",
+    "openai>=1.0.0",
 ]
 
 [project.scripts]
 hunyuan-image-mcp = "mcp_image_server:main"
+multi-api-image-mcp = "mcp_image_server_multi:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["."] 
