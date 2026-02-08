@@ -2,6 +2,8 @@
 
 A Model Context Protocol (MCP) server for image generation using multiple AI providers including Tencent Hunyuan, OpenAI DALL-E 3, and Doubao APIs.
 
+**Version**: 0.2.0
+
 ## Features
 
 ### 🎯 Multi-API Provider Support
@@ -16,6 +18,23 @@ A Model Context Protocol (MCP) server for image generation using multiple AI pro
 - Negative prompts for excluding unwanted elements
 - Intelligent provider selection and management
 - Unified parameter format with provider-specific options
+
+### 🌐 Transport Modes (New in v0.2.0)
+- **stdio Transport**: Local IDE integration (Cursor, Windsurf)
+- **HTTP Transport**: Remote access and enterprise deployment
+  - Multi-client concurrent connections
+  - Bearer Token authentication
+  - Session management
+  - RESTful API endpoints
+  - Suitable for cloud deployment and remote access
+
+> **Why HTTP Transport?**
+> Version 0.2.0 adds **Streamable HTTP** support (MCP's official standard as of 2024-11-05) to enable:
+> - **Remote Access**: Claude remote MCP requires public HTTP endpoints (stdio only works locally)
+> - **Enterprise Deployment**: Centralized service deployment with multiple concurrent clients
+> - **Cloud Native**: Compatible with containers, Kubernetes, and load balancers
+>
+> Note: This uses **Streamable HTTP** (POST/GET/DELETE), not the deprecated SSE-only approach. SSE is retained for compatibility but Streamable HTTP is the recommended standard.
 
 ### 🔧 Smart Provider Management
 - Automatic detection of available API providers
@@ -76,44 +95,114 @@ pip install -r requirements.lock.txt
 
 ### Environment Setup
 
-Create a `.env` file in the project root with the following content:
-```
+Create a `.env` file in the project root. See `.env.example` for all available options.
+
+#### Basic Configuration
+```bash
+# Image save directory
+MCP_IMAGE_SAVE_DIR=./generated_images
+
+# API Provider Credentials (configure at least one)
 TENCENT_SECRET_ID=your_tencent_secret_id
 TENCENT_SECRET_KEY=your_tencent_secret_key
-MCP_IMAGE_SAVE_DIR=your_saved_img_dir
+OPENAI_API_KEY=your_openai_api_key
+DOUBAO_ACCESS_KEY=your_doubao_access_key
+DOUBAO_SECRET_KEY=your_doubao_secret_key
+```
+
+#### Transport Configuration (Optional)
+```bash
+# Transport mode: stdio (default, for local IDE) or http (for remote access)
+MCP_TRANSPORT=stdio
+
+# HTTP transport settings (only needed for HTTP mode)
+MCP_HOST=127.0.0.1
+MCP_PORT=8000
+
+# Authentication (recommended for HTTP mode)
+MCP_AUTH_TOKEN=your-secure-random-token
 ```
 
 ## Usage
 
-### 🔄 Choosing Your Server Version
+### 🔄 Transport Modes
 
-This project offers two server implementations:
+This server supports two transport modes:
 
-#### Single API Server (Original)
+| Feature | stdio Transport | HTTP Transport |
+|---------|----------------|----------------|
+| **Use Case** | Local IDE integration | Remote access, enterprise deployment |
+| **Connection** | Subprocess communication | HTTP/HTTPS network |
+| **Multi-client** | ❌ Single client | ✅ Multiple concurrent clients |
+| **Remote Access** | ❌ Not supported | ✅ Supported |
+| **Authentication** | Not needed | Bearer Token |
+| **Deployment** | Simple | Cloud-ready |
+
+### 🚀 Quick Start
+
+#### Unified Entry Point (Recommended)
 ```bash
-# For Tencent Hunyuan API only
+# Use unified entry that auto-detects transport mode from .env
+python mcp_image_server_unified.py
+```
+
+The unified server will automatically use the transport mode specified in your `.env` file:
+- `MCP_TRANSPORT=stdio` → Local stdio mode for IDE integration
+- `MCP_TRANSPORT=http` → HTTP server mode for remote access
+
+#### Legacy Server Versions
+```bash
+# Multi-API server with stdio (for backward compatibility)
+python mcp_image_server_multi.py
+
+# Original single-API server with stdio
 python mcp_image_server.py
 ```
 
-#### Multi-API Server (New - Recommended)
+### 📡 HTTP Transport Mode
+
+For remote access and enterprise deployment, use HTTP transport:
+
+#### 1. Configure HTTP Mode
 ```bash
-# Supports Tencent Hunyuan, OpenAI DALL-E 3, and Doubao APIs
-python mcp_image_server_multi.py
+# Set in .env file
+MCP_TRANSPORT=http
+MCP_HOST=127.0.0.1
+MCP_PORT=8000
+MCP_AUTH_TOKEN=your-secure-token  # Optional but recommended
 ```
 
-**Recommendation**: Use the multi-API server (`mcp_image_server_multi.py`) for access to all supported providers and enhanced features.
-
-### Running the MCP Server
-
-You can run the MCP server as follows:
-
+#### 2. Start HTTP Server
 ```bash
-# Multi-API server (recommended)
-python mcp_image_server_multi.py
-
-# Or original single-API server
-python mcp_image_server.py
+python mcp_image_server_unified.py
 ```
+
+Server will start on `http://127.0.0.1:8000` with endpoints:
+- `GET /health` - Health check
+- `POST /mcp/v1/messages` - Send JSON-RPC messages
+- `GET /mcp/v1/messages` - Subscribe to SSE events
+- `DELETE /mcp/v1/sessions` - Close session
+
+#### 3. Test HTTP Server
+```bash
+# Check server health
+curl http://127.0.0.1:8000/health
+
+# Run comprehensive tests
+python test_mcp_server.py
+
+# Test with API key for actual image generation
+python test_mcp_server.py --with-api
+```
+
+#### 4. Use HTTP Client
+```bash
+# Run example client
+python example_http_client.py basic       # Explore server capabilities
+python example_http_client.py generate    # Generate images (requires API key)
+```
+
+For detailed HTTP transport documentation, see **[HTTP_TRANSPORT_GUIDE.md](HTTP_TRANSPORT_GUIDE.md)**
 
 Screenshot of MCP server running successfully:
 
@@ -334,12 +423,53 @@ Tip: You don't need to manually move the generated images from the save director
   ![After Design](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/after_design.png)
 
 
+### 🧪 Testing
+
+The project includes comprehensive testing tools:
+
+#### Protocol Tests (No API Key Required)
+```bash
+# Test MCP protocol functionality without API keys
+python test_mcp_server.py
+```
+
+This tests:
+- ✅ Health check endpoint
+- ✅ MCP initialization handshake
+- ✅ Tools listing
+- ✅ Resources listing and reading
+- ✅ Prompts listing
+- ✅ Session management
+
+#### Functional Tests (API Key Required)
+```bash
+# Test actual image generation with configured providers
+python test_mcp_server.py --with-api
+```
+
+This additionally tests:
+- ✅ Real image generation with OpenAI
+- ✅ Real image generation with Hunyuan
+- ✅ Real image generation with Doubao
+
+**Note**: At least one API key must be configured in `.env` to run functional tests.
+
 ### Troubleshooting
+
+#### General Issues
 - Ensure environment variables are set correctly
 - Check for spaces in paths; use quotes if needed
 - Ensure the virtual environment is activated (if using one)
 - Try running the server script directly to check for errors
 - Check UV environment with `uv --version`
+
+#### HTTP Transport Issues
+- **Connection refused**: Ensure server is running on correct host/port
+- **401 Unauthorized**: Check `MCP_AUTH_TOKEN` configuration
+- **404 Session not found**: Re-initialize connection to get new session ID
+- **No provider available**: Configure at least one API provider in `.env`
+
+For detailed troubleshooting, see **[HTTP_TRANSPORT_GUIDE.md](HTTP_TRANSPORT_GUIDE.md#故障排查)**
 
 ## Front-end Demo
 
@@ -408,13 +538,19 @@ For detailed API documentation and pricing, please refer to:
 
 ## RoadMap
 
-- **Current Version**
+- **Version 0.2.0** (Current)
   - ✅ Tencent Hunyuan image generation API
   - ✅ OpenAI DALL-E 3 API integration
   - ✅ Doubao API integration
   - ✅ Multi-provider management system
   - ✅ Intelligent provider selection
   - ✅ Unified parameter interface
+  - ✅ HTTP transport with Streamable HTTP protocol
+  - ✅ Remote access support
+  - ✅ Multi-client concurrent connections
+  - ✅ Bearer Token authentication
+  - ✅ Session management
+  - ✅ Comprehensive testing suite
 
 - **Future Plans**
   - Support more mainstream text-to-image model APIs, including:
@@ -435,7 +571,9 @@ For detailed API documentation and pricing, please refer to:
 
 ## Compatibility
 
-- This project has been verified to work with the Cursor and Windsurf IDE MCP integration.
+- **Local IDE Integration (stdio)**: Verified to work with Cursor and Windsurf IDE
+- **Remote Access (HTTP)**: Compatible with any MCP client supporting HTTP transport
+- **Claude Remote MCP**: HTTP transport enables connection to Claude with public HTTP endpoint
 
   - windsurf is also supported to integrated now
 

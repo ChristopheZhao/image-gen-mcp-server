@@ -3,42 +3,46 @@ import json
 from typing import Dict, List, Optional
 import asyncio
 import aiohttp
-import hashlib
-import hmac
-import time
 import sys
-from urllib.parse import urlencode
 from .base import BaseImageProvider, debug_print
 
 class DoubaoProvider(BaseImageProvider):
-    """ByteDance Doubao (豆包) image generation provider"""
-    
-    def __init__(self, access_key: str, secret_key: str, endpoint: Optional[str] = None, **kwargs):
+    """ByteDance Doubao (豆包) image generation provider using Ark API"""
+
+    def __init__(self, api_key: str, endpoint: Optional[str] = None, model: str = "doubao-seedream-4.0", **kwargs):
         super().__init__(**kwargs)
-        self.access_key = access_key
-        self.secret_key = secret_key
-        self.endpoint = endpoint or "https://visual.volcengineapi.com"
-        
+        self.api_key = api_key
+        self.endpoint = endpoint or "https://ark.cn-beijing.volces.com"
+        self.model = model  # doubao-seedream-4.0, doubao-seedream-4.5, etc.
+
     def get_provider_name(self) -> str:
         return "doubao"
-    
+
     def get_available_styles(self) -> Dict[str, str]:
+        """
+        Doubao Seedream models use prompt engineering for styles.
+        These style keywords will be appended to the prompt.
+        """
         return {
             "general": "通用风格",
-            "anime": "动漫风格",
-            "realistic": "写实风格", 
-            "oil_painting": "油画风格",
-            "watercolor": "水彩风格",
-            "sketch": "素描风格",
-            "cartoon": "卡通风格",
-            "chinese_painting": "国画风格",
-            "pixel_art": "像素艺术",
-            "cyberpunk": "赛博朋克",
-            "fantasy": "奇幻风格",
-            "sci_fi": "科幻风格"
+            "anime": "动漫风格 anime style",
+            "realistic": "写实风格 realistic photographic",
+            "oil_painting": "油画风格 oil painting",
+            "watercolor": "水彩风格 watercolor painting",
+            "sketch": "素描风格 pencil sketch",
+            "cartoon": "卡通风格 cartoon illustration",
+            "chinese_painting": "国画风格 traditional Chinese painting",
+            "pixel_art": "像素艺术 pixel art",
+            "cyberpunk": "赛博朋克 cyberpunk style",
+            "fantasy": "奇幻风格 fantasy art",
+            "sci_fi": "科幻风格 sci-fi concept art"
         }
-    
+
     def get_available_resolutions(self) -> Dict[str, str]:
+        """
+        Doubao Seedream 4.0/4.5 supported resolutions.
+        Format: WIDTHxHEIGHT
+        """
         return {
             "512x512": "512x512 (1:1 小正方形)",
             "768x768": "768x768 (1:1 正方形)",
@@ -50,114 +54,61 @@ class DoubaoProvider(BaseImageProvider):
             "768x1024": "768x1024 (3:4 竖向)",
             "1024x768": "1024x768 (4:3 横向)"
         }
-    
-    def _sign_request(self, method: str, uri: str, query: Dict, headers: Dict, body: str = "") -> str:
-        """Generate signature for Volcengine API request"""
-        # Create canonical request
-        canonical_headers = ""
-        signed_headers = ""
-        
-        # Sort headers
-        sorted_headers = sorted(headers.items())
-        for key, value in sorted_headers:
-            canonical_headers += f"{key.lower()}:{value}\n"
-            if signed_headers:
-                signed_headers += ";"
-            signed_headers += key.lower()
-        
-        # Create canonical query string
-        canonical_query = ""
-        if query:
-            sorted_query = sorted(query.items())
-            canonical_query = urlencode(sorted_query)
-        
-        # Create canonical request
-        canonical_request = f"{method}\n{uri}\n{canonical_query}\n{canonical_headers}\n{signed_headers}\n{hashlib.sha256(body.encode()).hexdigest()}"
-        
-        # Create string to sign
-        algorithm = "HMAC-SHA256"
-        credential_scope = f"{time.strftime('%Y%m%d', time.gmtime())}/visual/request"
-        string_to_sign = f"{algorithm}\n{headers['X-Date']}\n{credential_scope}\n{hashlib.sha256(canonical_request.encode()).hexdigest()}"
-        
-        # Calculate signature
-        kDate = hmac.new(f"volc{self.secret_key}".encode(), time.strftime('%Y%m%d', time.gmtime()).encode(), hashlib.sha256).digest()
-        kService = hmac.new(kDate, "visual".encode(), hashlib.sha256).digest()
-        kSigning = hmac.new(kService, "request".encode(), hashlib.sha256).digest()
-        signature = hmac.new(kSigning, string_to_sign.encode(), hashlib.sha256).hexdigest()
-        
-        return signature
-    
+
     async def generate_images(
-        self, 
-        query: str, 
+        self,
+        query: str,
         style: str = "general",
         resolution: str = "1024x1024",
         negative_prompt: str = "",
         **kwargs
     ) -> List[Dict]:
-        """Generate images using Doubao API"""
+        """Generate images using Doubao Ark API"""
         try:
-            debug_print(f"[DEBUG] Doubao generate_images call started: query={query}, style={style}, resolution={resolution}")
-            
+            debug_print(f"[DEBUG] Doubao generate_images call started: query={query}, style={style}, resolution={resolution}, model={self.model}")
+
             # Parse resolution
             width, height = map(int, resolution.split('x'))
-            
-            # Prepare request data
-            request_data = {
-                "req_key": f"doubao_img_{int(time.time())}",
-                "prompt": query,
-                "model_version": "general_v1.4",  # Use latest model
-                "width": width,
-                "height": height,
-                "scale": 7.5,  # Guidance scale
-                "ddim_steps": 25,  # Number of inference steps
-                "seed": -1,  # Random seed
-                "use_sr": True,  # Super resolution
-                "logo_info": {
-                    "add_logo": False,
-                    "position": 0,
-                    "language": 0,
-                    "opacity": 0.3
-                }
-            }
-            
-            # Add style information to prompt if specified
+
+            # Build prompt with style
+            full_prompt = query
             if style and style != "general":
-                style_desc = self.get_available_styles().get(style, style)
-                request_data["prompt"] = f"{query}, {style_desc}"
-            
+                style_desc = self.get_available_styles().get(style, "")
+                if style_desc:
+                    # Extract English style description
+                    english_part = style_desc.split()[-1] if " " in style_desc else style_desc
+                    full_prompt = f"{query}, {english_part}"
+
+            # Prepare request data (Ark API format, similar to OpenAI)
+            request_data = {
+                "model": self.model,
+                "prompt": full_prompt,
+                "n": 1,  # Number of images to generate
+                "size": f"{width}x{height}",
+                "response_format": "b64_json"  # Return base64 encoded image
+            }
+
             # Add negative prompt if provided
             if negative_prompt:
                 request_data["negative_prompt"] = negative_prompt
-            
+
             # Prepare headers
-            timestamp = time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())
             headers = {
                 "Content-Type": "application/json",
-                "X-Date": timestamp,
-                "Host": "visual.volcengineapi.com"
+                "Authorization": f"Bearer {self.api_key}"
             }
-            
-            # Convert data to JSON
-            body = json.dumps(request_data)
-            
-            # Sign the request
-            signature = self._sign_request("POST", "/", {}, headers, body)
-            
-            # Add authorization header
-            headers["Authorization"] = f"HMAC-SHA256 Credential={self.access_key}/{time.strftime('%Y%m%d', time.gmtime())}/visual/request, SignedHeaders=content-type;host;x-date, Signature={signature}"
-            
-            debug_print(f"[DEBUG] Calling Doubao API with prompt: {request_data['prompt']}")
-            
+
+            debug_print(f"[DEBUG] Calling Doubao Ark API with prompt: {full_prompt}")
+
             # Make API request
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{self.endpoint}/",
+                    f"{self.endpoint}/api/v3/images/generations",
                     headers=headers,
-                    data=body,
+                    json=request_data,
                     timeout=aiohttp.ClientTimeout(total=60)
                 ) as response:
-                    
+
                     if response.status != 200:
                         error_text = await response.text()
                         debug_print(f"[ERROR] Doubao API request failed with status {response.status}: {error_text}")
@@ -165,55 +116,65 @@ class DoubaoProvider(BaseImageProvider):
                             "error": f"Doubao API request failed: HTTP {response.status}",
                             "content_type": "text/plain"
                         }]
-                    
+
                     response_data = await response.json()
                     debug_print(f"[DEBUG] Doubao API response received")
-                    
+
                     # Check for API errors
-                    if "data" not in response_data or not response_data["data"]:
-                        error_msg = response_data.get("message", "Unknown error from Doubao API")
+                    if "error" in response_data:
+                        error_msg = response_data["error"].get("message", "Unknown error from Doubao API")
                         debug_print(f"[ERROR] Doubao API error: {error_msg}")
                         return [{
                             "error": f"Doubao API error: {error_msg}",
                             "content_type": "text/plain"
                         }]
-                    
-                    # Extract image data
-                    data = response_data["data"]
-                    if "image_urls" not in data or not data["image_urls"]:
-                        debug_print("[ERROR] No image URLs in Doubao response")
+
+                    # Extract image data (Ark API returns OpenAI-compatible format)
+                    if "data" not in response_data or not response_data["data"]:
+                        debug_print("[ERROR] No data in Doubao response")
                         return [{
-                            "error": "No image URLs returned from Doubao API",
+                            "error": "No image data returned from Doubao API",
                             "content_type": "text/plain"
                         }]
-                    
-                    # Download the first image
-                    image_url = data["image_urls"][0]
-                    debug_print(f"[DEBUG] Downloading image from Doubao: {image_url}")
-                    
-                    image_data = await self._download_image(image_url)
-                    if not image_data:
+
+                    # Get first image (we requested n=1)
+                    image_item = response_data["data"][0]
+
+                    # Handle response format
+                    if "b64_json" in image_item:
+                        # Base64 encoded image
+                        encoded_image = image_item["b64_json"]
+                        debug_print(f"[DEBUG] Received base64 image, length: {len(encoded_image)}")
+                    elif "url" in image_item:
+                        # Image URL - need to download
+                        image_url = image_item["url"]
+                        debug_print(f"[DEBUG] Downloading image from URL: {image_url}")
+                        image_data = await self._download_image(image_url)
+                        if not image_data:
+                            return [{
+                                "error": "Failed to download image from Doubao",
+                                "content_type": "text/plain"
+                            }]
+                        encoded_image = base64.b64encode(image_data).decode('utf-8')
+                    else:
+                        debug_print("[ERROR] No image data or URL in response")
                         return [{
-                            "error": "Failed to download image from Doubao",
+                            "error": "Invalid response format from Doubao API",
                             "content_type": "text/plain"
                         }]
-                    
-                    # Encode to base64
-                    encoded_image = base64.b64encode(image_data).decode('utf-8')
-                    debug_print(f"[DEBUG] Image successfully encoded to base64, length: {len(encoded_image)}")
-                    
+
                     # Return result
                     result = [{
                         "content": encoded_image,
-                        "content_type": "image/jpeg",
+                        "content_type": "image/png",  # Ark API typically returns PNG
                         "description": query,
                         "style": style,
                         "provider": self.get_provider_name()
                     }]
-                    
-                    debug_print(f"[DEBUG] Returning Doubao result: {result[0].keys()}")
+
+                    debug_print(f"[DEBUG] Returning Doubao result successfully")
                     return result
-                    
+
         except asyncio.TimeoutError:
             error_msg = "Doubao API request timeout"
             debug_print(f"[ERROR] {error_msg}")
@@ -230,7 +191,7 @@ class DoubaoProvider(BaseImageProvider):
                 "error": f"Error occurred during Doubao image generation: {error_msg}",
                 "content_type": "text/plain"
             }]
-    
+
     async def _download_image(self, url: str) -> Optional[bytes]:
         """Download image from URL"""
         debug_print(f"[DEBUG] Downloading image from URL: {url}")
