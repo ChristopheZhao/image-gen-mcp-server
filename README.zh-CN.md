@@ -2,6 +2,8 @@
 
 一个基于 Model Context Protocol (MCP) 的图像生成服务，支持多个主流AI提供商，包括腾讯混元、OpenAI DALL-E 3 和豆包 API。
 
+**版本**: 0.2.0
+
 ## 特性
 
 ### 🎯 多API提供商支持
@@ -16,6 +18,23 @@
 - 支持负面提示词（排除不想要的元素）
 - 智能提供商选择和管理
 - 统一参数格式，支持提供商特定选项
+
+### 🌐 传输模式（v0.2.0 新增）
+- **stdio 传输**: 本地 IDE 集成（Cursor、Windsurf）
+- **HTTP 传输**: 远程访问和企业部署
+  - 多客户端并发连接
+  - Bearer Token 认证
+  - 会话管理
+  - RESTful API 端点
+  - 适合云部署和远程访问
+
+> **为什么需要 HTTP 传输？**
+> v0.2.0 版本增加了 **Streamable HTTP** 支持（MCP 官方标准，协议版本 2024-11-05），以实现：
+> - **远程访问**: Claude 远程 MCP 要求公网 HTTP 端点（stdio 仅限本地）
+> - **企业部署**: 集中式服务部署，支持多客户端并发
+> - **云原生**: 兼容容器、Kubernetes 和负载均衡器
+>
+> 注意：采用 **Streamable HTTP**（POST/GET/DELETE），而非已废弃的纯 SSE 方式。SSE 保留用于兼容，但 Streamable HTTP 是推荐标准。
 
 ### 🔧 智能提供商管理
 - 自动检测可用的API提供商
@@ -74,42 +93,117 @@ pip install -r requirements.lock.txt
 
 ### 环境变量配置
 
-在项目根目录下创建 `.env` 文件，内容如下：
-```
+在项目根目录下创建 `.env` 文件。完整配置选项请参考 `.env.example`。
+
+#### 基础配置
+```bash
+# 图像保存目录
+MCP_IMAGE_SAVE_DIR=./generated_images
+
+# API 提供商凭证（至少配置一个）
 TENCENT_SECRET_ID=你的腾讯云SecretId
 TENCENT_SECRET_KEY=你的腾讯云SecretKey
-MCP_IMAGE_SAVE_DIR=你的保存生成图片的位置
+OPENAI_API_KEY=你的OpenAI密钥
+DOUBAO_ACCESS_KEY=你的豆包AccessKey
+DOUBAO_SECRET_KEY=你的豆包SecretKey
+```
+
+#### 传输配置（可选）
+```bash
+# 传输模式：stdio（默认，本地IDE）或 http（远程访问）
+MCP_TRANSPORT=stdio
+
+# HTTP 传输设置（仅 HTTP 模式需要）
+MCP_HOST=127.0.0.1
+MCP_PORT=8000
+
+# 认证（HTTP 模式推荐）
+MCP_AUTH_TOKEN=你的安全令牌
 ```
 
 ## 用法
 
-### 🔄 选择服务器版本
+### 🔄 传输模式
 
-本项目提供两种服务器实现：
+本服务器支持两种传输模式：
 
-#### 单API服务器（原版）
+| 功能特性 | stdio 传输 | HTTP 传输 |
+|---------|-----------|----------|
+| **使用场景** | 本地 IDE 集成 | 远程访问、企业部署 |
+| **连接方式** | 子进程通信 | HTTP/HTTPS 网络 |
+| **多客户端** | ❌ 单客户端 | ✅ 多客户端并发 |
+| **远程访问** | ❌ 不支持 | ✅ 支持 |
+| **认证** | 无需 | Bearer Token |
+| **部署** | 简单 | 云就绪 |
+
+### 🚀 快速开始
+
+#### 统一入口（推荐）
 ```bash
-# 仅支持腾讯混元API
-python mcp_image_server.py
+# 方式 1: 作为模块运行（推荐）
+python -m mcp_image_server
+
+# 方式 2: 使用入口脚本
+./mcp-server
+
+# 方式 3: pip 安装后
+mcp-image-server
 ```
 
-#### 多API服务器（新版 - 推荐）
+统一服务器会自动使用 `.env` 文件中指定的传输模式：
+- `MCP_TRANSPORT=stdio` → 本地 stdio 模式，用于 IDE 集成
+- `MCP_TRANSPORT=http` → HTTP 服务器模式，用于远程访问
+
+#### 旧版示例
 ```bash
-# 支持腾讯混元、OpenAI DALL-E 3 和豆包 API
-python mcp_image_server_multi.py
+# 旧版示例已移到 examples/ 目录
+python examples/legacy_single_api_server.py
 ```
 
-**推荐**：使用多API服务器（`mcp_image_server_multi.py`）以获得所有支持的提供商和增强功能。
+### 📡 HTTP 传输模式
 
-### 启动 MCP 服务
+用于远程访问和企业部署，使用 HTTP 传输：
 
+#### 1. 配置 HTTP 模式
 ```bash
-# 多API服务器（推荐）
-python mcp_image_server_multi.py
-
-# 或原版单API服务器
-python mcp_image_server.py
+# 在 .env 文件中设置
+MCP_TRANSPORT=http
+MCP_HOST=127.0.0.1
+MCP_PORT=8000
+MCP_AUTH_TOKEN=你的安全令牌  # 可选但推荐
 ```
+
+#### 2. 启动 HTTP 服务器
+```bash
+python -m mcp_image_server
+```
+
+服务器将在 `http://127.0.0.1:8000` 启动，提供以下端点：
+- `GET /health` - 健康检查
+- `POST /mcp/v1/messages` - 发送 JSON-RPC 消息
+- `GET /mcp/v1/messages` - 订阅 SSE 事件
+- `DELETE /mcp/v1/sessions` - 关闭会话
+
+#### 3. 测试 HTTP 服务器
+```bash
+# 检查服务器健康状态
+curl http://127.0.0.1:8000/health
+
+# 运行完整测试
+python test_mcp_server.py
+
+# 使用 API key 测试真实图像生成
+python test_mcp_server.py --with-api
+```
+
+#### 4. 使用 HTTP 客户端
+```bash
+# 运行示例客户端
+python example_http_client.py basic       # 探索服务器功能
+python example_http_client.py generate    # 生成图像（需要 API key）
+```
+
+详细的 HTTP 传输文档请参见 **[HTTP_TRANSPORT_GUIDE.md](HTTP_TRANSPORT_GUIDE.md)**
 
 MCP 服务器成功运行截图：
 
@@ -308,7 +402,7 @@ generate_image(
 
 你也可以让 Cursor 为你的网站设计图片 ✨。Cursor 可以使用 MCP 工具根据特定布局要求生成匹配的图片 🎨。
 
-提示：你无需手动将生成的图片从保存目录移动到项目目录。Cursor 会在得到你的批准后自动处理这个过程。这是使用 Cursor 的主要优势之一。
+提示：你无需手动将生成的图片从保存目录移动到项目目录。Cursor 会在得到你的批准后自动处理这个过程。
 
 - 计划移动图片
 
@@ -327,12 +421,53 @@ generate_image(
   ![设计后](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/after_design.png)
 
 
-#### 常见问题排查
+### 🧪 测试
+
+项目包含完整的测试工具：
+
+#### 协议测试（无需 API Key）
+```bash
+# 测试 MCP 协议功能，无需 API keys
+python test_mcp_server.py
+```
+
+测试内容：
+- ✅ 健康检查端点
+- ✅ MCP 初始化握手
+- ✅ 工具列表
+- ✅ 资源列表和读取
+- ✅ 提示模板列表
+- ✅ 会话管理
+
+#### 功能测试（需要 API Key）
+```bash
+# 测试真实图像生成功能，需配置提供商
+python test_mcp_server.py --with-api
+```
+
+额外测试内容：
+- ✅ OpenAI 真实图像生成
+- ✅ 混元真实图像生成
+- ✅ 豆包真实图像生成
+
+**注意**: 至少需要在 `.env` 中配置一个 API key 才能运行功能测试。
+
+### 常见问题排查
+
+#### 一般问题
 - 检查环境变量是否正确
 - 路径有空格时请加引号
 - 确认虚拟环境已激活
 - 可直接运行服务端脚本排查报错
 - 检查 UV 环境 `uv --version`
+
+#### HTTP 传输问题
+- **连接被拒绝**: 确保服务器在正确的 host/port 上运行
+- **401 未授权**: 检查 `MCP_AUTH_TOKEN` 配置
+- **404 会话未找到**: 重新初始化连接获取新会话 ID
+- **无可用提供商**: 在 `.env` 中至少配置一个 API 提供商
+
+详细故障排查请参见 **[HTTP_TRANSPORT_GUIDE.md](HTTP_TRANSPORT_GUIDE.md#故障排查)**
 
 ## API 参考
 
@@ -392,13 +527,19 @@ generate_image(
 
 ## RoadMap
 
-- **当前版本**
+- **v0.2.0 版本**（当前）
   - ✅ 腾讯混元图像生成API
   - ✅ OpenAI DALL-E 3 API集成
   - ✅ 豆包API集成
   - ✅ 多提供商管理系统
   - ✅ 智能提供商选择
   - ✅ 统一参数接口
+  - ✅ Streamable HTTP 协议传输
+  - ✅ 远程访问支持
+  - ✅ 多客户端并发连接
+  - ✅ Bearer Token 认证
+  - ✅ 会话管理
+  - ✅ 完整测试套件
 
 - **未来计划**
   - 支持更多主流文生图模型 API，包括：
@@ -431,7 +572,9 @@ generate_image(
 
 ## 兼容性
 
-- 本项目已在 Cursor 和 Windsurf IDE 的 MCP 集成环境下验证可用。
+- **本地 IDE 集成（stdio）**: 已在 Cursor 和 Windsurf IDE 中验证可用
+- **远程访问（HTTP）**: 兼容任何支持 HTTP 传输的 MCP 客户端
+- **Claude 远程 MCP**: HTTP 传输支持通过公网 HTTP 端点连接 Claude
 
   - Windsurf IDE 现已支持集成
 
@@ -442,8 +585,6 @@ generate_image(
     - 生成结果如下
 
     ![Windsurf 调用结果](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/img_1746070231.jpg)
-
-- 未来计划支持更多兼容 MCP 协议的 IDE 和开发环境。
 
 ## 致谢
 

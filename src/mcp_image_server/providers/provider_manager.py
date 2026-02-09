@@ -1,9 +1,13 @@
 import os
 from typing import Dict, Optional, List
+from dotenv import load_dotenv
 from .base import BaseImageProvider, debug_print
 from .hunyuan_provider import HunyuanProvider
 from .openai_provider import OpenAIProvider
 from .doubao_provider import DoubaoProvider
+
+# Load .env file to make environment variables available via os.getenv()
+load_dotenv()
 
 class ProviderManager:
     """Manages multiple image generation API providers"""
@@ -48,19 +52,19 @@ class ProviderManager:
             except Exception as e:
                 debug_print(f"[ERROR] Failed to initialize OpenAI provider: {e}")
         
-        # Initialize Doubao provider
-        doubao_access_key = os.getenv("DOUBAO_ACCESS_KEY")
-        doubao_secret_key = os.getenv("DOUBAO_SECRET_KEY")
+        # Initialize Doubao provider (New Ark API)
+        doubao_api_key = os.getenv("DOUBAO_API_KEY")
         doubao_endpoint = os.getenv("DOUBAO_ENDPOINT")  # Optional custom endpoint
-        if doubao_access_key and doubao_secret_key:
+        doubao_model = os.getenv("DOUBAO_MODEL", "doubao-seedream-4.0")  # Default to 4.0
+        if doubao_api_key:
             try:
                 self.providers["doubao"] = DoubaoProvider(
-                    access_key=doubao_access_key,
-                    secret_key=doubao_secret_key,
-                    endpoint=doubao_endpoint
+                    api_key=doubao_api_key,
+                    endpoint=doubao_endpoint,
+                    model=doubao_model
                 )
                 debug_print("[INFO] Doubao provider initialized successfully")
-                # Set as default if no default is set
+                #Set as default if no default is set
                 if not self.default_provider:
                     self.default_provider = "doubao"
             except Exception as e:

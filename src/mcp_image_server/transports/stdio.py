@@ -9,7 +9,7 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import TextContent, ImageContent
-from api_providers import ProviderManager
+from ..providers import ProviderManager
 
 from dotenv import load_dotenv
 from pydantic import Field
@@ -355,7 +355,7 @@ def main():
         debug_print("Expected environment variables:")
         debug_print("- TENCENT_SECRET_ID and TENCENT_SECRET_KEY for Hunyuan")
         debug_print("- OPENAI_API_KEY (and optionally OPENAI_BASE_URL) for OpenAI")
-        debug_print("- DOUBAO_ACCESS_KEY and DOUBAO_SECRET_KEY (and optionally DOUBAO_ENDPOINT) for Doubao")
+        debug_print("- DOUBAO_API_KEY (and optionally DOUBAO_ENDPOINT) for Doubao (using Ark API)")
     
     # Print available tools and resources
     debug_print("\nAvailable Tools:")

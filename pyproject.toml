@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hunyuan-image-mcp"
-version = "0.1.0"
-description = "Hunyuan图像生成MCP服务器"
+version = "0.2.0"
+description = "Multi-API图像生成MCP服务器，支持stdio和HTTP传输"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
@@ -15,11 +15,12 @@ dependencies = [
     "python-dotenv>=0.19.0",
     "mcp>=1.6.0",
     "openai>=1.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
 ]
 
 [project.scripts]
-hunyuan-image-mcp = "mcp_image_server:main"
-multi-api-image-mcp = "mcp_image_server_multi:main"
+mcp-image-server = "mcp_image_server.main:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["."] 
+packages = ["src/mcp_image_server"] 
