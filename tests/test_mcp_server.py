@@ -16,7 +16,7 @@ from typing import Optional
 
 # 从配置文件加载配置
 try:
-    from config import ServerConfig
+    from mcp_image_server.config import ServerConfig
     _config = ServerConfig()
     DEFAULT_BASE_URL = f"http://{_config.host}:{_config.port}"
     DEFAULT_AUTH_TOKEN = _config.auth_token
@@ -423,7 +423,7 @@ def check_api_keys():
     """检查可用的API keys"""
     # 使用 config 模块加载 .env 文件
     try:
-        from config import ServerConfig
+        from mcp_image_server.config import ServerConfig
         config = ServerConfig()
         credentials = config.get_provider_credentials()
         return list(credentials.keys())

@@ -142,21 +142,24 @@ This server supports two transport modes:
 
 #### Unified Entry Point (Recommended)
 ```bash
-# Use unified entry that auto-detects transport mode from .env
-python mcp_image_server_unified.py
+# Method 1: Run as module (recommended)
+python -m mcp_image_server
+
+# Method 2: Use entry script
+./mcp-server
+
+# Method 3: After pip install
+mcp-image-server
 ```
 
 The unified server will automatically use the transport mode specified in your `.env` file:
 - `MCP_TRANSPORT=stdio` → Local stdio mode for IDE integration
 - `MCP_TRANSPORT=http` → HTTP server mode for remote access
 
-#### Legacy Server Versions
+#### Legacy Examples
 ```bash
-# Multi-API server with stdio (for backward compatibility)
-python mcp_image_server_multi.py
-
-# Original single-API server with stdio
-python mcp_image_server.py
+# Legacy examples moved to examples/ directory
+python examples/legacy_single_api_server.py
 ```
 
 ### 📡 HTTP Transport Mode
@@ -174,7 +177,7 @@ MCP_AUTH_TOKEN=your-secure-token  # Optional but recommended
 
 #### 2. Start HTTP Server
 ```bash
-python mcp_image_server_unified.py
+python -m mcp_image_server
 ```
 
 Server will start on `http://127.0.0.1:8000` with endpoints:
@@ -296,43 +299,20 @@ To add this MCP server in Cursor:
 {
   "mcpServers": {
     "image-generation": {
-      "name": "image-generation service",
-      "description": "support the image generation service using tencent hunyuan API",
-      "type": "stdio",
-      "command": "D:\\your_path\\image-gen-mcp-server\\.venv\\Scripts\\python.exe",
-      "args": ["D:\\your_path\\image-gen-mcp-server\\mcp_image_server.py"],
-      "environment": ["TENCENT_SECRET_ID", "TENCENT_SECRET_KEY","MCP_IMAGE_SAVE_DIR"],
-      "autoRestart": true,
-      "startupTimeoutMs": 30000
-    }
-  }
-} 
-```
-
-#### Multi-API Configuration (Recommended)
-```json
-{
-  "mcpServers": {
-    "multi-image-generation": {
       "name": "Multi-API Image Generation Service",
       "description": "Multi-provider image generation using Hunyuan, OpenAI, and Doubao APIs",
       "type": "stdio",
       "command": "D:\\your_path\\image-gen-mcp-server\\.venv\\Scripts\\python.exe",
-      "args": ["D:\\your_path\\image-gen-mcp-server\\mcp_image_server_multi.py"],
-      "environment": [
-        "TENCENT_SECRET_ID", 
-        "TENCENT_SECRET_KEY",
-        "OPENAI_API_KEY",
-        "DOUBAO_ACCESS_KEY",
-        "DOUBAO_SECRET_KEY",
-        "MCP_IMAGE_SAVE_DIR"
-      ],
+      "args": ["-m", "mcp_image_server"],
+      "environment": ["TENCENT_SECRET_ID", "TENCENT_SECRET_KEY", "OPENAI_API_KEY", "DOUBAO_API_KEY", "MCP_IMAGE_SAVE_DIR"],
       "autoRestart": true,
       "startupTimeoutMs": 30000
     }
   }
 }
 ```
+
+>  📝 **Note:** For detailed VS Code integration guide, see [docs/VSCODE_INTEGRATION.md](docs/VSCODE_INTEGRATION.md)
 
 #### Environment Variables
 

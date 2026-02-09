@@ -20,9 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-hunyuan-image-mcp = "mcp_image_server:main"
-multi-api-image-mcp = "mcp_image_server_multi:main"
-unified-image-mcp = "mcp_image_server_unified:main"
+mcp-image-server = "mcp_image_server.main:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["."] 
+packages = ["src/mcp_image_server"] 

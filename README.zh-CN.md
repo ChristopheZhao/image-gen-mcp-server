@@ -140,21 +140,24 @@ MCP_AUTH_TOKEN=你的安全令牌
 
 #### 统一入口（推荐）
 ```bash
-# 使用统一入口，自动根据 .env 检测传输模式
-python mcp_image_server_unified.py
+# 方式 1: 作为模块运行（推荐）
+python -m mcp_image_server
+
+# 方式 2: 使用入口脚本
+./mcp-server
+
+# 方式 3: pip 安装后
+mcp-image-server
 ```
 
 统一服务器会自动使用 `.env` 文件中指定的传输模式：
 - `MCP_TRANSPORT=stdio` → 本地 stdio 模式，用于 IDE 集成
 - `MCP_TRANSPORT=http` → HTTP 服务器模式，用于远程访问
 
-#### 旧版服务器
+#### 旧版示例
 ```bash
-# 多API服务器，使用 stdio（向后兼容）
-python mcp_image_server_multi.py
-
-# 原版单API服务器，使用 stdio
-python mcp_image_server.py
+# 旧版示例已移到 examples/ 目录
+python examples/legacy_single_api_server.py
 ```
 
 ### 📡 HTTP 传输模式
@@ -172,7 +175,7 @@ MCP_AUTH_TOKEN=你的安全令牌  # 可选但推荐
 
 #### 2. 启动 HTTP 服务器
 ```bash
-python mcp_image_server_unified.py
+python -m mcp_image_server
 ```
 
 服务器将在 `http://127.0.0.1:8000` 启动，提供以下端点：

@@ -6,7 +6,7 @@ based on configuration, ensuring backward compatibility while enabling remote ac
 """
 
 import sys
-from config import load_config
+from .config import load_config
 
 
 def main():
@@ -26,13 +26,13 @@ def main():
         if config.is_stdio_transport():
             # Use existing FastMCP stdio implementation for backward compatibility
             print("Using stdio transport (FastMCP)", file=sys.stderr)
-            from mcp_image_server_multi import main as stdio_main
+            from .transports.stdio import main as stdio_main
             stdio_main()
 
         elif config.is_http_transport():
             # Use new HTTP implementation
             print(f"Using HTTP transport: {config.host}:{config.port}", file=sys.stderr)
-            from mcp_image_server_http import run_http_server
+            from .transports.http_server import run_http_server
             run_http_server(config)
 
         else:

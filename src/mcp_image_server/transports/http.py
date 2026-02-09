@@ -16,7 +16,7 @@ from starlette.responses import Response, JSONResponse, StreamingResponse
 from starlette.datastructures import Headers
 from sse_starlette import EventSourceResponse
 
-from session_manager import SessionManager, Session
+from .session_manager import SessionManager, Session
 
 
 class MCPHTTPHandler:

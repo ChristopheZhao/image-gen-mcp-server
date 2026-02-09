@@ -21,11 +21,11 @@ from starlette.routing import Route
 from starlette.middleware import Middleware
 import uvicorn
 
-from config import ServerConfig
-from session_manager import SessionManager
-from auth import create_auth_middleware, AuthRequiredMiddleware, OriginValidationMiddleware
-from http_transport import MCPHTTPHandler, health_check
-from api_providers import ProviderManager
+from ..config import ServerConfig
+from .session_manager import SessionManager
+from .auth import create_auth_middleware, AuthRequiredMiddleware, OriginValidationMiddleware
+from .http import MCPHTTPHandler, health_check
+from ..providers import ProviderManager
 
 
 def debug_print(*args, **kwargs):

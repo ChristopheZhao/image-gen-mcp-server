@@ -9,7 +9,7 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import TextContent, ImageContent
-from api_providers import ProviderManager
+from ..providers import ProviderManager
 
 from dotenv import load_dotenv
 from pydantic import Field
