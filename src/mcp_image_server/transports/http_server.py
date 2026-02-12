@@ -592,7 +592,7 @@ You can specify provider:style or provider:resolution format, or let the system 
         routes = [
             Route("/mcp/v1/messages", self.http_handler.handle_post, methods=["POST"]),
             Route("/mcp/v1/messages", self.http_handler.handle_get, methods=["GET"]),
-            Route("/mcp/v1/sessions", self.http_handler.handle_delete, methods=["DELETE"]),
+            Route("/mcp/v1/messages", self.http_handler.handle_delete, methods=["DELETE"]),
             Route("/health", health_check, methods=["GET"]),
         ]
 

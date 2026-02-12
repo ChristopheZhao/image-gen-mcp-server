@@ -246,7 +246,7 @@ OPENAI_API_KEY=${OPENAI_API_KEY}  # 从密钥管理器读取
 | `GET` | `/health` | 健康检查 |
 | `POST` | `/mcp/v1/messages` | 发送 JSON-RPC 消息 |
 | `GET` | `/mcp/v1/messages` | 订阅 SSE 事件流 |
-| `DELETE` | `/mcp/v1/sessions` | 删除会话 |
+| `DELETE` | `/mcp/v1/messages` | 删除会话 |
 
 ### 1. 健康检查
 
@@ -648,7 +648,7 @@ data: {"type":"keepalive"}
 
 ### 5. 会话删除
 
-#### DELETE /mcp/v1/sessions
+#### DELETE /mcp/v1/messages
 
 删除当前会话。
 

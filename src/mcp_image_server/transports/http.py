@@ -4,7 +4,7 @@ HTTP transport layer for MCP server.
 This module implements the MCP Streamable HTTP transport protocol:
 - POST /mcp/v1/messages - Send JSON-RPC messages
 - GET  /mcp/v1/messages - Subscribe to SSE event stream
-- DELETE /mcp/v1/sessions - Terminate session
+- DELETE /mcp/v1/messages - Terminate session
 """
 
 import asyncio
@@ -347,7 +347,7 @@ class MCPHTTPHandler:
 
     async def handle_delete(self, request: Request) -> Response:
         """
-        Handle DELETE /mcp/v1/sessions - Terminate session.
+        Handle DELETE /mcp/v1/messages - Terminate session.
 
         Args:
             request: HTTP DELETE request

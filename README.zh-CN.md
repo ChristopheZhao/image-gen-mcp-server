@@ -182,7 +182,7 @@ python -m mcp_image_server
 - `GET /health` - 健康检查
 - `POST /mcp/v1/messages` - 发送 JSON-RPC 消息
 - `GET /mcp/v1/messages` - 订阅 SSE 事件
-- `DELETE /mcp/v1/sessions` - 关闭会话
+- `DELETE /mcp/v1/messages` - 关闭会话
 
 #### 3. 测试 HTTP 服务器
 ```bash

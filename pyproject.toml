@@ -7,7 +7,7 @@ name = "hunyuan-image-mcp"
 version = "0.2.0"
 description = "Multi-API图像生成MCP服务器，支持stdio和HTTP传输"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 dependencies = [
     "tencentcloud-sdk-python>=3.0.0",
