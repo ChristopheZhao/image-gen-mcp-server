@@ -280,7 +280,7 @@ class MCPHTTPClient:
         print(f"\n🔒 关闭连接...")
 
         response = await client.delete(
-            f"{self.base_url}/mcp/v1/sessions",
+            f"{self.base_url}/mcp/v1/messages",
             headers=self._get_headers()
         )
 

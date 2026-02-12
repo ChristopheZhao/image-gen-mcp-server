@@ -166,7 +166,7 @@ async def test_http_server():
                 # Test 7: Delete session
                 print("\n[7] Testing session deletion...")
                 response = await client.delete(
-                    f"{base_url}/mcp/v1/sessions",
+                    f"{base_url}/mcp/v1/messages",
                     headers=headers
                 )
 

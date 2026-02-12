@@ -184,7 +184,7 @@ Server will start on `http://127.0.0.1:8000` with endpoints:
 - `GET /health` - Health check
 - `POST /mcp/v1/messages` - Send JSON-RPC messages
 - `GET /mcp/v1/messages` - Subscribe to SSE events
-- `DELETE /mcp/v1/sessions` - Close session
+- `DELETE /mcp/v1/messages` - Close session
 
 #### 3. Test HTTP Server
 ```bash
