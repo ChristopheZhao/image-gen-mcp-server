@@ -267,11 +267,19 @@ class MCPServerTester:
 
                 if result['type'] == 'text':
                     text = result['text']
-                    if 'not available' in text.lower() or 'no provider' in text.lower():
-                        self._print_result(True, "正确返回了'无提供商'错误")
-                        print(f"  消息: {text}")
+                    try:
+                        payload = json.loads(text)
+                    except Exception:
+                        self._print_result(False, f"非结构化返回内容: {text}")
+                        return
+
+                    if payload.get("ok") is False:
+                        error = payload.get("error") or {}
+                        self._print_result(True, "正确返回了结构化错误")
+                        print(f"  错误码: {error.get('code')}")
+                        print(f"  消息: {error.get('message')}")
                     else:
-                        self._print_result(False, f"意外的返回内容: {text}")
+                        self._print_result(False, f"意外的返回内容: {payload}")
                 else:
                     self._print_result(False, f"意外的返回类型: {result['type']}")
             else:
@@ -312,16 +320,26 @@ class MCPServerTester:
 
                 if result['type'] == 'text':
                     text = result['text']
-                    if 'successfully generated' in text.lower() or '成功' in text:
+                    try:
+                        payload = json.loads(text)
+                    except Exception:
+                        self._print_result(False, f"{provider} 返回非结构化内容")
+                        print(f"  文本: {text[:300]}")
+                        return
+
+                    if payload.get("ok"):
+                        image = (payload.get("images") or [{}])[0]
                         self._print_result(True, f"{provider} 图像生成成功")
-                        print(f"  结果: {text}")
+                        print(f"  provider: {image.get('provider')}")
+                        print(f"  local_path: {image.get('local_path')}")
+                        print(f"  mime_type: {image.get('mime_type')}")
+                        if image.get("save_error"):
+                            print(f"  save_error: {image.get('save_error')}")
                     else:
+                        error = payload.get("error") or {}
                         self._print_result(False, f"{provider} 图像生成失败")
-                        print(f"  错误: {text}")
-                elif result['type'] == 'image':
-                    self._print_result(True, f"{provider} 返回图像数据")
-                    print(f"  图像类型: {result['mimeType']}")
-                    print(f"  数据长度: {len(result['data'])} bytes")
+                        print(f"  code: {error.get('code')}")
+                        print(f"  message: {error.get('message')}")
                 else:
                     self._print_result(False, f"意外的返回类型: {result['type']}")
             else:

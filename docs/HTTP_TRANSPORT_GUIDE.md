@@ -457,10 +457,34 @@ Mcp-Session-Id: 550e8400-e29b-41d4-a716-446655440000
   "jsonrpc": "2.0",
   "id": 3,
   "result": {
+    "isError": false,
+    "structuredContent": {
+      "version": "1.0",
+      "ok": true,
+      "images": [
+        {
+          "id": "img_openai_1707304800",
+          "provider": "openai",
+          "mime_type": "image/png",
+          "file_name": "cat_openai_1707304800.png",
+          "local_path": "/abs/path/generated_images/cat_openai_1707304800.png",
+          "url": null,
+          "size_bytes": 1543210,
+          "revised_prompt": null,
+          "save_error": null
+        }
+      ],
+      "error": null
+    },
     "content": [
       {
         "type": "text",
-        "text": "Image successfully generated and saved to: ./generated_images/cat_openai_1707304800.jpg (Provider: openai)"
+        "text": "{\"version\":\"1.0\",\"ok\":true,\"images\":[{\"id\":\"img_openai_1707304800\",\"provider\":\"openai\",\"mime_type\":\"image/png\",\"file_name\":\"cat_openai_1707304800.png\",\"local_path\":\"/abs/path/generated_images/cat_openai_1707304800.png\",\"url\":null,\"size_bytes\":1543210,\"revised_prompt\":null,\"save_error\":null}],\"error\":null}"
+      },
+      {
+        "type": "image",
+        "mimeType": "image/png",
+        "data": "<base64 image data>"
       }
     ]
   }
@@ -474,10 +498,21 @@ Mcp-Session-Id: 550e8400-e29b-41d4-a716-446655440000
   "jsonrpc": "2.0",
   "id": 3,
   "result": {
+    "isError": true,
+    "structuredContent": {
+      "version": "1.0",
+      "ok": false,
+      "images": [],
+      "error": {
+        "code": "provider_unavailable",
+        "message": "Provider 'xxx' not available.",
+        "details": {}
+      }
+    },
     "content": [
       {
         "type": "text",
-        "text": "Image generation error: API rate limit exceeded"
+        "text": "{\"version\":\"1.0\",\"ok\":false,\"images\":[],\"error\":{\"code\":\"provider_unavailable\",\"message\":\"Provider 'xxx' not available.\",\"details\":{}}}"
       }
     ]
   }
