@@ -264,6 +264,7 @@ class MCPHTTPClient:
                     print(f"✅ 图像生成成功！")
                     print(f"   provider: {image.get('provider')}")
                     print(f"   local_path: {image.get('local_path')}")
+                    print(f"   url: {image.get('url')}")
                     print(f"   mime_type: {image.get('mime_type')}")
                     if image.get("save_error"):
                         print(f"   ⚠️ save_error: {image.get('save_error')}")

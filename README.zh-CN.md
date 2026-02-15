@@ -99,6 +99,8 @@ pip install -r requirements.lock.txt
 ```bash
 # 图像保存目录
 MCP_IMAGE_SAVE_DIR=./generated_images
+# 生成图片外链的公网基础地址（HTTP 模式，可选但推荐）
+# MCP_PUBLIC_BASE_URL=https://mcp.your-domain.com
 
 # API 提供商凭证（至少配置一个）
 TENCENT_SECRET_ID=你的腾讯云SecretId
@@ -183,6 +185,11 @@ python -m mcp_image_server
 - `POST /mcp/v1/messages` - 发送 JSON-RPC 消息
 - `GET /mcp/v1/messages` - 订阅 SSE 事件
 - `DELETE /mcp/v1/messages` - 关闭会话
+- `GET /images/{filename}` - 提供已生成图片的静态访问
+
+`generate_image` 工具会返回 `images[].url`（HTTP 客户端）。  
+如果服务通过反向代理或公网域名对外，请设置 `MCP_PUBLIC_BASE_URL`，保证返回 URL 可被外部访问。
+为保证浏览器/前端渲染，`/images/*` 默认对外开放（即使启用了 MCP API Bearer 认证）。
 
 #### 3. 测试 HTTP 服务器
 ```bash
@@ -617,4 +624,3 @@ python test_mcp_server.py --with-api
 请确保适当更新测试，并遵循现有的代码风格。
 
 > 感谢您对改进这个项目的关注！
-

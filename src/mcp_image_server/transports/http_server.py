@@ -5,7 +5,6 @@ This module implements the MCP server with Streamable HTTP transport,
 migrated from FastMCP (stdio) to native Server class for remote access support.
 """
 
-import os
 import sys
 import base64
 import time
@@ -13,11 +12,13 @@ import json
 import asyncio
 from typing import Dict, Any, List, Optional
 from pathlib import Path
+from urllib.parse import quote
 
 from mcp.server import Server
 import mcp.types as types
 from starlette.applications import Starlette
-from starlette.routing import Route
+from starlette.routing import Route, Mount
+from starlette.staticfiles import StaticFiles
 from starlette.middleware import Middleware
 import uvicorn
 
@@ -46,6 +47,7 @@ class MCPImageServerHTTP:
             config: Server configuration
         """
         self.config = config
+        self.image_save_dir = Path(self.config.image_save_dir).resolve()
 
         # Initialize MCP Server
         self.server = Server("Multi-API Image Generation MCP Service")
@@ -303,6 +305,36 @@ class MCPImageServerHTTP:
         }
         return extension_map.get(mime, "img")
 
+    def _resolve_public_base_url(self) -> Optional[str]:
+        """
+        Resolve base URL used for generated image links.
+
+        Priority:
+        1. MCP_PUBLIC_BASE_URL (recommended for reverse proxy/public deployment)
+        2. Derived from host/port when host is specific and directly reachable
+        """
+        configured = (self.config.public_base_url or "").strip()
+        if configured:
+            return configured.rstrip("/")
+
+        host = (self.config.host or "").strip()
+        if host in {"", "0.0.0.0", "::"}:
+            return None
+
+        host_part = host
+        # Wrap IPv6 literal to build valid URL host section.
+        if ":" in host and not host.startswith("["):
+            host_part = f"[{host}]"
+
+        return f"http://{host_part}:{self.config.port}"
+
+    def _build_public_image_url(self, file_name: str) -> Optional[str]:
+        """Build externally accessible URL for a generated image file."""
+        base_url = self._resolve_public_base_url()
+        if not base_url:
+            return None
+        return f"{base_url}/images/{quote(file_name)}"
+
     async def _call_tool_structured(
         self,
         name: str,
@@ -500,7 +532,7 @@ class MCPImageServerHTTP:
                     else:
                         filename = f"img_{actual_provider}_{timestamp}.{extension}"
 
-                    save_dir = Path(self.config.image_save_dir)
+                    save_dir = self.image_save_dir
                     file_path = save_dir / filename
                     local_path: Optional[str] = None
                     save_error: Optional[str] = None
@@ -521,7 +553,7 @@ class MCPImageServerHTTP:
                         "mime_type": image_mime_type,
                         "file_name": filename if local_path else None,
                         "local_path": local_path,
-                        "url": None,
+                        "url": self._build_public_image_url(filename) if local_path else None,
                         "size_bytes": len(image_data_bytes),
                         # Internal field used to build ImageContent, stripped from structured output.
                         "base64_data": image_data,
@@ -810,7 +842,14 @@ You can specify provider:style or provider:resolution format, or let the system 
 
     def create_app(self) -> Starlette:
         """Create Starlette application with routes and middleware."""
+        middleware_whitelist_paths = ["/health", "/images*"]
+
         routes = [
+            Mount(
+                "/images",
+                app=StaticFiles(directory=str(self.image_save_dir), check_dir=False),
+                name="generated-images"
+            ),
             Route("/mcp/v1/messages", self.http_handler.handle_post, methods=["POST"]),
             Route("/mcp/v1/messages", self.http_handler.handle_get, methods=["GET"]),
             Route("/mcp/v1/messages", self.http_handler.handle_delete, methods=["DELETE"]),
@@ -824,14 +863,20 @@ You can specify provider:style or provider:resolution format, or let the system 
             middleware.append(
                 Middleware(
                     OriginValidationMiddleware,
-                    allowed_origins=self.config.allowed_origins
+                    allowed_origins=self.config.allowed_origins,
+                    whitelist_paths=middleware_whitelist_paths
                 )
             )
 
         # Add authentication middleware
         if self.config.auth_enabled():
             middleware.append(create_auth_middleware(self.config.auth_token))
-            middleware.append(Middleware(AuthRequiredMiddleware))
+            middleware.append(
+                Middleware(
+                    AuthRequiredMiddleware,
+                    whitelist_paths=middleware_whitelist_paths
+                )
+            )
 
         return Starlette(routes=routes, middleware=middleware)
 
@@ -845,8 +890,14 @@ You can specify provider:style or provider:resolution format, or let the system 
         debug_print("Multi-API Image Generation MCP HTTP Server Starting...")
         debug_print(f"Configuration: {self.config}")
         debug_print(f"Available providers: {self.provider_manager.get_available_providers()}")
-        debug_print(f"Image save directory: {self.config.image_save_dir}")
+        debug_print(f"Image save directory: {self.image_save_dir}")
         debug_print(f"HTTP server: {self.config.host}:{self.config.port}")
+        debug_print(f"Static image route: /images")
+        public_base_url = self._resolve_public_base_url()
+        debug_print(
+            "Public image base URL: "
+            f"{public_base_url if public_base_url else 'not available (set MCP_PUBLIC_BASE_URL when host is wildcard)'}"
+        )
         debug_print(f"Authentication: {'Enabled' if self.config.auth_enabled() else 'Disabled'}")
         debug_print("=" * 50)
 

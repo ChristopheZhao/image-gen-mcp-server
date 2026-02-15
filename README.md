@@ -101,6 +101,8 @@ Create a `.env` file in the project root. See `.env.example` for all available o
 ```bash
 # Image save directory
 MCP_IMAGE_SAVE_DIR=./generated_images
+# Public base URL for generated image links (HTTP mode, optional but recommended)
+# MCP_PUBLIC_BASE_URL=https://mcp.your-domain.com
 
 # API Provider Credentials (configure at least one)
 TENCENT_SECRET_ID=your_tencent_secret_id
@@ -185,6 +187,11 @@ Server will start on `http://127.0.0.1:8000` with endpoints:
 - `POST /mcp/v1/messages` - Send JSON-RPC messages
 - `GET /mcp/v1/messages` - Subscribe to SSE events
 - `DELETE /mcp/v1/messages` - Close session
+- `GET /images/{filename}` - Serve generated image files
+
+`generate_image` tool returns `images[].url` for HTTP clients.  
+If server is exposed through reverse proxy/public domain, set `MCP_PUBLIC_BASE_URL` to ensure URL is externally reachable.
+`/images/*` is intentionally public so browser/front-end image rendering works even when MCP API auth is enabled.
 
 #### 3. Test HTTP Server
 ```bash
@@ -598,5 +605,3 @@ We welcome contributions of all kinds! Here are some ways you can help:
 Please make sure to update tests as appropriate and follow the existing coding style.
 
 > We appreciate your interest in making this project better!
-
-

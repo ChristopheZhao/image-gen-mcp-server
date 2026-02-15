@@ -7,6 +7,7 @@ supporting both environment variables and .env files.
 
 import os
 from typing import List, Literal, Optional
+from urllib.parse import urlparse
 from pydantic import Field, AliasChoices
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -88,6 +89,15 @@ class ServerConfig(BaseSettings):
         default="./generated_images",
         description="Directory to save generated images",
         validation_alias=AliasChoices('MCP_IMAGE_SAVE_DIR', 'image_save_dir')
+    )
+
+    public_base_url: Optional[str] = Field(
+        default=None,
+        description=(
+            "Public base URL for generated image access in HTTP mode "
+            "(for example: https://mcp.example.com)"
+        ),
+        validation_alias=AliasChoices('MCP_PUBLIC_BASE_URL', 'public_base_url')
     )
 
     # ========== Provider Configuration ==========
@@ -227,6 +237,14 @@ class ServerConfig(BaseSettings):
                     file=sys.stderr
                 )
 
+            if self.public_base_url:
+                parsed = urlparse(self.public_base_url)
+                if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                    raise ValueError(
+                        "Invalid MCP_PUBLIC_BASE_URL. Expected absolute http(s) URL, "
+                        f"got: {self.public_base_url}"
+                    )
+
     def __str__(self) -> str:
         """String representation of config (safe, no secrets)."""
         return (
@@ -234,6 +252,7 @@ class ServerConfig(BaseSettings):
             f"host={self.host if self.is_http_transport() else 'N/A'}, "
             f"port={self.port if self.is_http_transport() else 'N/A'}, "
             f"auth_enabled={self.auth_enabled()}, "
+            f"public_base_url={'configured' if self.public_base_url else 'auto'}, "
             f"providers={list(self.get_provider_credentials().keys())})"
         )
 

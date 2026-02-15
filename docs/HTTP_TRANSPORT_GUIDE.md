@@ -178,6 +178,7 @@ python example_http_client.py generate
 | 环境变量 | 默认值 | 说明 |
 |---------|--------|------|
 | `MCP_IMAGE_SAVE_DIR` | `./generated_images` | 图像保存目录 |
+| `MCP_PUBLIC_BASE_URL` | `None` | 生成图片外链的基础地址（建议公网部署时设置） |
 
 #### API 提供商配置
 
@@ -205,6 +206,8 @@ MCP_HOST=127.0.0.1
 MCP_PORT=8000
 MCP_DEBUG=true
 MCP_LOG_LEVEL=DEBUG
+# 本地直接访问可不设置，默认按 host:port 生成 URL
+# MCP_PUBLIC_BASE_URL=http://127.0.0.1:8000
 
 # 禁用认证（本地开发）
 # MCP_AUTH_TOKEN=
@@ -221,6 +224,8 @@ MCP_HOST=0.0.0.0  # 监听所有接口
 MCP_PORT=8000
 MCP_DEBUG=false
 MCP_LOG_LEVEL=INFO
+# 通过公网域名/反向代理访问时必须设置，确保 images[].url 可外部访问
+MCP_PUBLIC_BASE_URL=https://mcp.your-domain.com
 
 # 启用认证（必需）
 MCP_AUTH_TOKEN=your-secure-random-token-here
@@ -247,6 +252,9 @@ OPENAI_API_KEY=${OPENAI_API_KEY}  # 从密钥管理器读取
 | `POST` | `/mcp/v1/messages` | 发送 JSON-RPC 消息 |
 | `GET` | `/mcp/v1/messages` | 订阅 SSE 事件流 |
 | `DELETE` | `/mcp/v1/messages` | 删除会话 |
+| `GET` | `/images/{filename}` | 访问已生成图片文件 |
+
+说明：`/images/*` 默认不要求 Bearer Token，便于前端直接渲染图片 URL。
 
 ### 1. 健康检查
 
@@ -468,7 +476,7 @@ Mcp-Session-Id: 550e8400-e29b-41d4-a716-446655440000
           "mime_type": "image/png",
           "file_name": "cat_openai_1707304800.png",
           "local_path": "/abs/path/generated_images/cat_openai_1707304800.png",
-          "url": null,
+          "url": "https://mcp.your-domain.com/images/cat_openai_1707304800.png",
           "size_bytes": 1543210,
           "revised_prompt": null,
           "save_error": null
@@ -479,7 +487,7 @@ Mcp-Session-Id: 550e8400-e29b-41d4-a716-446655440000
     "content": [
       {
         "type": "text",
-        "text": "{\"version\":\"1.0\",\"ok\":true,\"images\":[{\"id\":\"img_openai_1707304800\",\"provider\":\"openai\",\"mime_type\":\"image/png\",\"file_name\":\"cat_openai_1707304800.png\",\"local_path\":\"/abs/path/generated_images/cat_openai_1707304800.png\",\"url\":null,\"size_bytes\":1543210,\"revised_prompt\":null,\"save_error\":null}],\"error\":null}"
+        "text": "{\"version\":\"1.0\",\"ok\":true,\"images\":[{\"id\":\"img_openai_1707304800\",\"provider\":\"openai\",\"mime_type\":\"image/png\",\"file_name\":\"cat_openai_1707304800.png\",\"local_path\":\"/abs/path/generated_images/cat_openai_1707304800.png\",\"url\":\"https://mcp.your-domain.com/images/cat_openai_1707304800.png\",\"size_bytes\":1543210,\"revised_prompt\":null,\"save_error\":null}],\"error\":null}"
       },
       {
         "type": "image",
@@ -490,6 +498,10 @@ Mcp-Session-Id: 550e8400-e29b-41d4-a716-446655440000
   }
 }
 ```
+
+说明：
+- 当 `MCP_PUBLIC_BASE_URL` 已配置时，`images[].url` 会使用该地址生成外部可访问链接。
+- 未配置时会尝试使用 `http://<MCP_HOST>:<MCP_PORT>`；若 `MCP_HOST=0.0.0.0` 或 `::`，则 `images[].url` 可能为 `null`。
 
 **响应（失败）:**
 
@@ -729,6 +741,8 @@ curl -X POST http://127.0.0.1:8000/mcp/v1/messages \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{...}}'
 ```
+
+注意：`/images/*` 静态图片路由默认不要求 `Authorization`，用于支持浏览器直接加载 `images[].url`。
 
 ### 安全最佳实践
 

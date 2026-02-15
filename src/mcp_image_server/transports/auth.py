@@ -23,6 +23,24 @@ from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp
 
 
+def _is_whitelisted_path(path: str, whitelist_paths: List[str]) -> bool:
+    """
+    Check if request path is whitelisted.
+
+    Supports exact match and prefix wildcard pattern:
+    - exact: /health
+    - prefix: /images*
+    """
+    for pattern in whitelist_paths:
+        if pattern.endswith("*"):
+            prefix = pattern[:-1]
+            if path.startswith(prefix):
+                return True
+        elif path == pattern:
+            return True
+    return False
+
+
 class BearerTokenUser(BaseUser):
     """User authenticated via Bearer token."""
 
@@ -184,7 +202,7 @@ class AuthRequiredMiddleware:
 
         # Check if path is whitelisted
         path = scope["path"]
-        if path in self.whitelist_paths:
+        if _is_whitelisted_path(path, self.whitelist_paths):
             await self.app(scope, receive, send)
             return
 
@@ -244,7 +262,7 @@ class OriginValidationMiddleware:
 
         # Check if path is whitelisted
         path = scope["path"]
-        if path in self.whitelist_paths:
+        if _is_whitelisted_path(path, self.whitelist_paths):
             await self.app(scope, receive, send)
             return
 
