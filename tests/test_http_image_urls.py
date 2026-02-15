@@ -1,4 +1,6 @@
+import asyncio
 import base64
+import json
 import sys
 import tempfile
 import unittest
@@ -97,6 +99,104 @@ class HTTPImageURLTests(unittest.IsolatedAsyncioTestCase):
             image = result["images"][0]
             self.assertIsNone(image.get("url"))
 
+    async def test_get_image_data_returns_base64_for_generated_image(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = ServerConfig(
+                transport="http",
+                host="127.0.0.1",
+                port=8123,
+                image_save_dir=tmpdir,
+            )
+            server = MCPImageServerHTTP(config)
+            server.provider_manager = _FakeProviderManager()
+
+            generate_result = await server._generate_image(prompt="test prompt")
+            self.assertTrue(generate_result.get("ok"))
+            image_id = generate_result["images"][0]["id"]
+
+            data_result = await server._get_image_data(image_id=image_id)
+            self.assertTrue(data_result.get("ok"))
+            self.assertEqual(len(data_result.get("images", [])), 1)
+
+            image = data_result["images"][0]
+            self.assertIn("base64_data", image)
+            decoded = base64.b64decode(image["base64_data"])
+            self.assertEqual(decoded, b"fake-image-bytes")
+
+    async def test_get_image_data_returns_error_when_image_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = ServerConfig(
+                transport="http",
+                host="127.0.0.1",
+                port=8123,
+                image_save_dir=tmpdir,
+            )
+            server = MCPImageServerHTTP(config)
+            server.provider_manager = _FakeProviderManager()
+
+            data_result = await server._get_image_data(image_id="img_not_found")
+            self.assertFalse(data_result.get("ok"))
+            self.assertEqual(data_result["error"]["code"], "image_not_found")
+
+    async def test_tools_call_get_image_data_keeps_base64_in_text_payload(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = ServerConfig(
+                transport="http",
+                host="127.0.0.1",
+                port=8123,
+                image_save_dir=tmpdir,
+            )
+            server = MCPImageServerHTTP(config)
+            server.provider_manager = _FakeProviderManager()
+
+            generate_result = await server._generate_image(prompt="test prompt")
+            image_id = generate_result["images"][0]["id"]
+
+            rpc_response = await server._handle_json_rpc(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 11,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "get_image_data",
+                        "arguments": {"image_id": image_id}
+                    }
+                },
+                session=None
+            )
+
+            result = rpc_response["result"]
+            self.assertFalse(result["isError"])
+            structured = result["structuredContent"]
+            self.assertTrue(structured["ok"])
+            self.assertIn("base64_data", structured["images"][0])
+
+            content_types = [item["type"] for item in result["content"]]
+            self.assertEqual(content_types, ["text"])
+
+            text_payload = json.loads(result["content"][0]["text"])
+            self.assertIn("base64_data", text_payload["images"][0])
+
+    async def test_get_image_data_rejects_large_payload(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = ServerConfig(
+                transport="http",
+                host="127.0.0.1",
+                port=8123,
+                image_save_dir=tmpdir,
+                get_image_data_max_bytes=1,
+            )
+            server = MCPImageServerHTTP(config)
+            server.provider_manager = _FakeProviderManager()
+
+            generate_result = await server._generate_image(prompt="test prompt")
+            self.assertTrue(generate_result.get("ok"))
+            image_id = generate_result["images"][0]["id"]
+
+            data_result = await server._get_image_data(image_id=image_id)
+            self.assertFalse(data_result.get("ok"))
+            self.assertEqual(data_result["error"]["code"], "payload_too_large")
+
 
 class HTTPStaticRouteTests(unittest.TestCase):
     def test_images_static_route_is_mounted(self):
@@ -123,6 +223,19 @@ class HTTPStaticRouteTests(unittest.TestCase):
         server = MCPImageServerHTTP(config)
         url = server._build_public_image_url("demo.png")
         self.assertEqual(url, "http://127.0.0.1:8123/images/demo.png")
+
+    def test_list_tools_includes_get_image_data(self):
+        config = ServerConfig(
+            transport="http",
+            host="127.0.0.1",
+            port=8123,
+            image_save_dir="./generated_images",
+        )
+        server = MCPImageServerHTTP(config)
+        tools = asyncio.run(server._list_tools())
+        tool_names = [tool.name for tool in tools]
+        self.assertIn("generate_image", tool_names)
+        self.assertIn("get_image_data", tool_names)
 
     def test_images_route_is_public_even_when_auth_enabled(self):
         with tempfile.TemporaryDirectory() as tmpdir:

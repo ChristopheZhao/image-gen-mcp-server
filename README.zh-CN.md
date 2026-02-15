@@ -101,6 +101,10 @@ pip install -r requirements.lock.txt
 MCP_IMAGE_SAVE_DIR=./generated_images
 # 生成图片外链的公网基础地址（HTTP 模式，可选但推荐）
 # MCP_PUBLIC_BASE_URL=https://mcp.your-domain.com
+# get_image_data 元数据缓存 TTL（秒）
+# MCP_IMAGE_RECORD_TTL=86400
+# get_image_data 返回 base64 时允许的最大字节数
+# MCP_GET_IMAGE_DATA_MAX_BYTES=10485760
 
 # API 提供商凭证（至少配置一个）
 TENCENT_SECRET_ID=你的腾讯云SecretId
@@ -191,6 +195,10 @@ python -m mcp_image_server
 如果服务通过反向代理或公网域名对外，请设置 `MCP_PUBLIC_BASE_URL`，保证返回 URL 可被外部访问。
 为保证浏览器/前端渲染，`/images/*` 默认对外开放（即使启用了 MCP API Bearer 认证）。
 
+推荐的 Agent 调用链路：
+1. 先调 `generate_image`，获取可渲染图片与稳定 `image_id`/`url`。
+2. 仅在需要“可编程 base64 文本”时再调 `get_image_data(image_id=...)`。
+
 #### 3. 测试 HTTP 服务器
 ```bash
 # 检查服务器健康状态
@@ -227,6 +235,7 @@ MCP 服务器成功运行截图：
 
 #### 工具
 - `generate_image` - 根据提示词、风格、分辨率生成图片
+- `get_image_data` - 按 `image_id` 获取已生成图片的 base64 文本
 
 #### 提示模板
 - `image_generation_prompt` - 生成图片请求的标准提示模板

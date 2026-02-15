@@ -48,6 +48,8 @@ class MCPImageServerHTTP:
         """
         self.config = config
         self.image_save_dir = Path(self.config.image_save_dir).resolve()
+        # In-memory metadata index for follow-up get_image_data calls.
+        self._image_records: Dict[str, Dict[str, Any]] = {}
 
         # Initialize MCP Server
         self.server = Server("Multi-API Image Generation MCP Service")
@@ -156,6 +158,21 @@ class MCPImageServerHTTP:
                     "required": ["prompt"]
                 },
                 outputSchema=self._build_generate_image_output_schema()
+            ),
+            types.Tool(
+                name="get_image_data",
+                description="Get base64 text data for a previously generated image by image_id (for programmable artifact use)",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "image_id": {
+                            "type": "string",
+                            "description": "Image id returned by generate_image, for example: img_openai_1771140000"
+                        }
+                    },
+                    "required": ["image_id"]
+                },
+                outputSchema=self._build_get_image_data_output_schema()
             )
         ]
 
@@ -207,6 +224,52 @@ class MCPImageServerHTTP:
             "required": ["version", "ok", "images", "error"]
         }
 
+    def _build_get_image_data_output_schema(self) -> Dict[str, Any]:
+        """Build fixed output schema for get_image_data."""
+        return {
+            "type": "object",
+            "properties": {
+                "version": {"type": "string"},
+                "ok": {"type": "boolean"},
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "provider": {"type": "string"},
+                            "mime_type": {"type": "string"},
+                            "file_name": {"type": "string"},
+                            "local_path": {"type": "string"},
+                            "url": {"type": ["string", "null"]},
+                            "size_bytes": {"type": "integer"},
+                            "base64_data": {"type": "string"}
+                        },
+                        "required": [
+                            "id",
+                            "provider",
+                            "mime_type",
+                            "file_name",
+                            "local_path",
+                            "url",
+                            "size_bytes",
+                            "base64_data"
+                        ]
+                    }
+                },
+                "error": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "code": {"type": "string"},
+                        "message": {"type": "string"},
+                        "details": {"type": "object"}
+                    },
+                    "required": ["code", "message", "details"]
+                }
+            },
+            "required": ["version", "ok", "images", "error"]
+        }
+
     def _build_tool_success_result(self, images: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Build a successful fixed-structure tool result."""
         return {
@@ -234,8 +297,12 @@ class MCPImageServerHTTP:
             }
         }
 
-    def _strip_binary_fields(self, result: Dict[str, Any]) -> Dict[str, Any]:
-        """Remove binary-only fields from structured payload."""
+    def _strip_binary_fields(
+        self,
+        result: Dict[str, Any],
+        preserve_base64: bool = False
+    ) -> Dict[str, Any]:
+        """Remove binary-only fields from structured payload when required."""
         payload: Dict[str, Any] = {
             "version": result.get("version"),
             "ok": result.get("ok"),
@@ -250,17 +317,32 @@ class MCPImageServerHTTP:
                     payload["images"].append({
                         key: value
                         for key, value in image.items()
-                        if key != "base64_data"
+                        if preserve_base64 or key != "base64_data"
                     })
                 else:
                     payload["images"].append(image)
 
         return payload
 
+    def _build_structured_payload_for_tool(
+        self,
+        tool_name: str,
+        structured_result: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Build structuredContent payload for a tool call.
+
+        generate_image keeps binary in image block only, while get_image_data
+        intentionally exposes base64 in structured/text payload for programmable use.
+        """
+        preserve_base64 = tool_name == "get_image_data"
+        return self._strip_binary_fields(structured_result, preserve_base64=preserve_base64)
+
     def _tool_result_to_content(
         self,
         result: Dict[str, Any],
-        text_payload: Optional[Dict[str, Any]] = None
+        text_payload: Optional[Dict[str, Any]] = None,
+        include_image_blocks: bool = True
     ) -> list[types.TextContent | types.ImageContent]:
         """Convert fixed tool result to text + optional image content payload."""
         content: list[types.TextContent | types.ImageContent] = []
@@ -273,6 +355,9 @@ class MCPImageServerHTTP:
                 text=json.dumps(text_payload, ensure_ascii=False)
             )
         )
+
+        if not include_image_blocks:
+            return content
 
         images = result.get("images", [])
         if isinstance(images, list):
@@ -291,6 +376,53 @@ class MCPImageServerHTTP:
                 )
 
         return content
+
+    def _cleanup_expired_image_records(self) -> None:
+        """Remove expired image metadata cache entries."""
+        ttl_seconds = self.config.image_record_ttl
+        if ttl_seconds <= 0:
+            return
+
+        now = time.time()
+        expired_ids: List[str] = []
+        for image_id, record in self._image_records.items():
+            created_at = float(record.get("created_at", 0))
+            if now - created_at > ttl_seconds:
+                expired_ids.append(image_id)
+
+        for image_id in expired_ids:
+            self._image_records.pop(image_id, None)
+
+    def _register_image_record(self, image: Dict[str, Any]) -> None:
+        """Register generated image metadata for later get_image_data retrieval."""
+        image_id = image.get("id")
+        if not image_id:
+            return
+
+        self._cleanup_expired_image_records()
+        self._image_records[image_id] = {
+            "id": image.get("id"),
+            "provider": image.get("provider"),
+            "mime_type": image.get("mime_type"),
+            "file_name": image.get("file_name"),
+            "local_path": image.get("local_path"),
+            "url": image.get("url"),
+            "size_bytes": image.get("size_bytes"),
+            "created_at": time.time()
+        }
+
+    def _get_image_record(self, image_id: str) -> Optional[Dict[str, Any]]:
+        """Get image metadata record by image_id."""
+        self._cleanup_expired_image_records()
+        return self._image_records.get(image_id)
+
+    def _is_under_image_save_dir(self, path: Path) -> bool:
+        """Ensure path is inside configured save directory."""
+        try:
+            path.resolve().relative_to(self.image_save_dir)
+            return True
+        except ValueError:
+            return False
 
     def _image_extension_from_mime(self, mime_type: str) -> str:
         """Infer filename extension from image MIME type."""
@@ -343,6 +475,8 @@ class MCPImageServerHTTP:
         """Execute tool and return fixed structured result."""
         if name == "generate_image":
             return await self._generate_image(**arguments)
+        if name == "get_image_data":
+            return await self._get_image_data(**arguments)
 
         return self._build_tool_error_result(
             code="unknown_tool",
@@ -357,7 +491,93 @@ class MCPImageServerHTTP:
     ) -> list[types.TextContent | types.ImageContent]:
         """Execute tool by name."""
         structured_result = await self._call_tool_structured(name, arguments)
-        return self._tool_result_to_content(structured_result)
+        text_payload = self._build_structured_payload_for_tool(name, structured_result)
+        include_image_blocks = name != "get_image_data"
+        return self._tool_result_to_content(
+            structured_result,
+            text_payload=text_payload,
+            include_image_blocks=include_image_blocks
+        )
+
+    async def _get_image_data(self, image_id: str) -> Dict[str, Any]:
+        """
+        Get base64 text data for an existing generated image.
+
+        This tool is intended for agent-side programmable usage when image
+        bytes are needed as text (for example artifact embedding).
+        """
+        if not image_id or not isinstance(image_id, str):
+            return self._build_tool_error_result(
+                code="invalid_arguments",
+                message="image_id is required and must be a string"
+            )
+
+        record = self._get_image_record(image_id)
+        if not record:
+            return self._build_tool_error_result(
+                code="image_not_found",
+                message=f"Image id '{image_id}' not found or expired",
+                details={"image_id": image_id}
+            )
+
+        local_path = record.get("local_path")
+        if not local_path:
+            return self._build_tool_error_result(
+                code="missing_local_path",
+                message=f"Image id '{image_id}' does not have a local file path",
+                details={"image_id": image_id}
+            )
+
+        file_path = Path(local_path).resolve()
+        if not self._is_under_image_save_dir(file_path):
+            return self._build_tool_error_result(
+                code="path_outside_save_dir",
+                message="Resolved file path is outside MCP_IMAGE_SAVE_DIR",
+                details={"image_id": image_id}
+            )
+
+        if not file_path.exists() or not file_path.is_file():
+            return self._build_tool_error_result(
+                code="file_not_found",
+                message=f"Image file does not exist for id '{image_id}'",
+                details={"image_id": image_id, "local_path": str(file_path)}
+            )
+
+        file_size = file_path.stat().st_size
+        if file_size > self.config.get_image_data_max_bytes:
+            return self._build_tool_error_result(
+                code="payload_too_large",
+                message=(
+                    "Image is too large for get_image_data response. "
+                    "Use images[].url to access the file directly."
+                ),
+                details={
+                    "image_id": image_id,
+                    "size_bytes": file_size,
+                    "max_bytes": self.config.get_image_data_max_bytes
+                }
+            )
+
+        try:
+            encoded = base64.b64encode(file_path.read_bytes()).decode("ascii")
+        except Exception as e:
+            return self._build_tool_error_result(
+                code="read_failed",
+                message=f"Failed to read image bytes: {e}",
+                details={"image_id": image_id}
+            )
+
+        image_info = {
+            "id": record.get("id"),
+            "provider": record.get("provider"),
+            "mime_type": record.get("mime_type") or "image/jpeg",
+            "file_name": record.get("file_name"),
+            "local_path": str(file_path),
+            "url": record.get("url"),
+            "size_bytes": file_size,
+            "base64_data": encoded
+        }
+        return self._build_tool_success_result(images=[image_info])
 
     async def _generate_image(
         self,
@@ -560,6 +780,8 @@ class MCPImageServerHTTP:
                         "revised_prompt": result[0].get("revised_prompt"),
                         "save_error": save_error
                     }
+                    if local_path:
+                        self._register_image_record(image_info)
                     return self._build_tool_success_result(images=[image_info])
                 else:
                     error_msg = "No image content in the generation result"
@@ -765,10 +987,12 @@ You can specify provider:style or provider:resolution format, or let the system 
                 tool_name = params.get("name")
                 tool_arguments = params.get("arguments", {})
                 structured_result = await self._call_tool_structured(tool_name, tool_arguments)
-                safe_structured_result = self._strip_binary_fields(structured_result)
+                safe_structured_result = self._build_structured_payload_for_tool(tool_name, structured_result)
+                include_image_blocks = tool_name != "get_image_data"
                 content_result = self._tool_result_to_content(
                     structured_result,
-                    text_payload=safe_structured_result
+                    text_payload=safe_structured_result,
+                    include_image_blocks=include_image_blocks
                 )
                 result = {
                     "content": [c.model_dump(mode="json") for c in content_result],
@@ -897,6 +1121,11 @@ You can specify provider:style or provider:resolution format, or let the system 
         debug_print(
             "Public image base URL: "
             f"{public_base_url if public_base_url else 'not available (set MCP_PUBLIC_BASE_URL when host is wildcard)'}"
+        )
+        debug_print(
+            "get_image_data limits: "
+            f"ttl={self.config.image_record_ttl}s, "
+            f"max_bytes={self.config.get_image_data_max_bytes}"
         )
         debug_print(f"Authentication: {'Enabled' if self.config.auth_enabled() else 'Disabled'}")
         debug_print("=" * 50)

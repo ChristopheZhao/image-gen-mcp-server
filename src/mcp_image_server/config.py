@@ -100,6 +100,18 @@ class ServerConfig(BaseSettings):
         validation_alias=AliasChoices('MCP_PUBLIC_BASE_URL', 'public_base_url')
     )
 
+    image_record_ttl: int = Field(
+        default=86400,
+        description="Image metadata cache TTL in seconds for get_image_data tool",
+        validation_alias=AliasChoices('MCP_IMAGE_RECORD_TTL', 'image_record_ttl')
+    )
+
+    get_image_data_max_bytes: int = Field(
+        default=10 * 1024 * 1024,
+        description="Maximum image size in bytes allowed for get_image_data base64 response",
+        validation_alias=AliasChoices('MCP_GET_IMAGE_DATA_MAX_BYTES', 'get_image_data_max_bytes')
+    )
+
     # ========== Provider Configuration ==========
     # Tencent Hunyuan
     tencent_secret_id: Optional[str] = Field(
@@ -245,6 +257,12 @@ class ServerConfig(BaseSettings):
                         f"got: {self.public_base_url}"
                     )
 
+            if self.image_record_ttl <= 0:
+                raise ValueError("MCP_IMAGE_RECORD_TTL must be greater than 0")
+
+            if self.get_image_data_max_bytes <= 0:
+                raise ValueError("MCP_GET_IMAGE_DATA_MAX_BYTES must be greater than 0")
+
     def __str__(self) -> str:
         """String representation of config (safe, no secrets)."""
         return (
@@ -253,6 +271,8 @@ class ServerConfig(BaseSettings):
             f"port={self.port if self.is_http_transport() else 'N/A'}, "
             f"auth_enabled={self.auth_enabled()}, "
             f"public_base_url={'configured' if self.public_base_url else 'auto'}, "
+            f"image_record_ttl={self.image_record_ttl}, "
+            f"get_image_data_max_bytes={self.get_image_data_max_bytes}, "
             f"providers={list(self.get_provider_credentials().keys())})"
         )
 
