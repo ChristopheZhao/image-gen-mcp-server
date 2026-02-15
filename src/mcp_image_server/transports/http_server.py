@@ -36,6 +36,8 @@ def debug_print(*args, **kwargs):
 class MCPImageServerHTTP:
     """MCP Image Generation Server with HTTP transport."""
 
+    TOOL_RESULT_VERSION = "1.0"
+
     def __init__(self, config: ServerConfig):
         """
         Initialize HTTP server.
@@ -84,7 +86,7 @@ class MCPImageServerHTTP:
         async def handle_call_tool(
             name: str,
             arguments: dict
-        ) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+        ) -> list[types.TextContent | types.ImageContent]:
             return await self._call_tool(name, arguments)
 
         # Register list_resources handler
@@ -150,9 +152,171 @@ class MCPImageServerHTTP:
                         }
                     },
                     "required": ["prompt"]
-                }
+                },
+                outputSchema=self._build_generate_image_output_schema()
             )
         ]
+
+    def _build_generate_image_output_schema(self) -> Dict[str, Any]:
+        """Build the fixed output schema for generate_image."""
+        return {
+            "type": "object",
+            "properties": {
+                "version": {"type": "string"},
+                "ok": {"type": "boolean"},
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "provider": {"type": "string"},
+                            "mime_type": {"type": "string"},
+                            "file_name": {"type": ["string", "null"]},
+                            "local_path": {"type": ["string", "null"]},
+                            "url": {"type": ["string", "null"]},
+                            "size_bytes": {"type": "integer"},
+                            "revised_prompt": {"type": ["string", "null"]},
+                            "save_error": {"type": ["string", "null"]}
+                        },
+                        "required": [
+                            "id",
+                            "provider",
+                            "mime_type",
+                            "file_name",
+                            "local_path",
+                            "url",
+                            "size_bytes",
+                            "revised_prompt",
+                            "save_error"
+                        ]
+                    }
+                },
+                "error": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "code": {"type": "string"},
+                        "message": {"type": "string"},
+                        "details": {"type": "object"}
+                    },
+                    "required": ["code", "message", "details"]
+                }
+            },
+            "required": ["version", "ok", "images", "error"]
+        }
+
+    def _build_tool_success_result(self, images: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Build a successful fixed-structure tool result."""
+        return {
+            "version": self.TOOL_RESULT_VERSION,
+            "ok": True,
+            "images": images,
+            "error": None
+        }
+
+    def _build_tool_error_result(
+        self,
+        code: str,
+        message: str,
+        details: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Build a failed fixed-structure tool result."""
+        return {
+            "version": self.TOOL_RESULT_VERSION,
+            "ok": False,
+            "images": [],
+            "error": {
+                "code": code,
+                "message": message,
+                "details": details or {}
+            }
+        }
+
+    def _strip_binary_fields(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """Remove binary-only fields from structured payload."""
+        payload: Dict[str, Any] = {
+            "version": result.get("version"),
+            "ok": result.get("ok"),
+            "images": [],
+            "error": result.get("error")
+        }
+
+        images = result.get("images")
+        if isinstance(images, list):
+            for image in images:
+                if isinstance(image, dict):
+                    payload["images"].append({
+                        key: value
+                        for key, value in image.items()
+                        if key != "base64_data"
+                    })
+                else:
+                    payload["images"].append(image)
+
+        return payload
+
+    def _tool_result_to_content(
+        self,
+        result: Dict[str, Any],
+        text_payload: Optional[Dict[str, Any]] = None
+    ) -> list[types.TextContent | types.ImageContent]:
+        """Convert fixed tool result to text + optional image content payload."""
+        content: list[types.TextContent | types.ImageContent] = []
+
+        if text_payload is None:
+            text_payload = self._strip_binary_fields(result)
+        content.append(
+            types.TextContent(
+                type="text",
+                text=json.dumps(text_payload, ensure_ascii=False)
+            )
+        )
+
+        images = result.get("images", [])
+        if isinstance(images, list):
+            for image in images:
+                if not isinstance(image, dict):
+                    continue
+                base64_data = image.get("base64_data")
+                if not base64_data:
+                    continue
+                content.append(
+                    types.ImageContent(
+                        type="image",
+                        data=base64_data,
+                        mimeType=image.get("mime_type", "image/jpeg")
+                    )
+                )
+
+        return content
+
+    def _image_extension_from_mime(self, mime_type: str) -> str:
+        """Infer filename extension from image MIME type."""
+        mime = (mime_type or "").lower()
+        extension_map = {
+            "image/jpeg": "jpg",
+            "image/jpg": "jpg",
+            "image/png": "png",
+            "image/webp": "webp",
+            "image/gif": "gif",
+            "image/bmp": "bmp"
+        }
+        return extension_map.get(mime, "img")
+
+    async def _call_tool_structured(
+        self,
+        name: str,
+        arguments: dict
+    ) -> Dict[str, Any]:
+        """Execute tool and return fixed structured result."""
+        if name == "generate_image":
+            return await self._generate_image(**arguments)
+
+        return self._build_tool_error_result(
+            code="unknown_tool",
+            message=f"Unknown tool: {name}",
+            details={"tool_name": name}
+        )
 
     async def _call_tool(
         self,
@@ -160,10 +324,8 @@ class MCPImageServerHTTP:
         arguments: dict
     ) -> list[types.TextContent | types.ImageContent]:
         """Execute tool by name."""
-        if name == "generate_image":
-            return await self._generate_image(**arguments)
-        else:
-            raise ValueError(f"Unknown tool: {name}")
+        structured_result = await self._call_tool_structured(name, arguments)
+        return self._tool_result_to_content(structured_result)
 
     async def _generate_image(
         self,
@@ -173,7 +335,7 @@ class MCPImageServerHTTP:
         resolution: str = "",
         negative_prompt: str = "",
         file_prefix: str = ""
-    ) -> list[types.TextContent | types.ImageContent]:
+    ) -> Dict[str, Any]:
         """Generate image using provider APIs."""
         debug_print(f"generate_image called: prompt={prompt}, provider={provider}, style={style}, resolution={resolution}")
 
@@ -200,7 +362,11 @@ class MCPImageServerHTTP:
                 available_providers = self.provider_manager.get_available_providers()
                 error_text = f"No provider specified and no default provider available. Available providers: {available_providers}"
                 debug_print(f"[ERROR] {error_text}")
-                return [types.TextContent(type="text", text=error_text)]
+                return self._build_tool_error_result(
+                    code="provider_missing",
+                    message=error_text,
+                    details={"available_providers": available_providers}
+                )
 
         # Get the provider instance
         provider_instance = self.provider_manager.get_provider(actual_provider)
@@ -208,21 +374,44 @@ class MCPImageServerHTTP:
             available_providers = self.provider_manager.get_available_providers()
             error_text = f"Provider '{actual_provider}' not available. Available providers: {available_providers}"
             debug_print(f"[ERROR] {error_text}")
-            return [types.TextContent(type="text", text=error_text)]
+            return self._build_tool_error_result(
+                code="provider_unavailable",
+                message=error_text,
+                details={
+                    "provider": actual_provider,
+                    "available_providers": available_providers
+                }
+            )
 
         #  Validate style
         if actual_style and not provider_instance.validate_style(actual_style):
             available_styles = provider_instance.get_available_styles()
             error_text = f"Invalid style '{actual_style}' for provider '{actual_provider}'. Available styles: {list(available_styles.keys())}"
             debug_print(f"[ERROR] {error_text}")
-            return [types.TextContent(type="text", text=error_text)]
+            return self._build_tool_error_result(
+                code="invalid_style",
+                message=error_text,
+                details={
+                    "provider": actual_provider,
+                    "style": actual_style,
+                    "available_styles": list(available_styles.keys())
+                }
+            )
 
         # Validate resolution
         if actual_resolution and not provider_instance.validate_resolution(actual_resolution):
             available_resolutions = provider_instance.get_available_resolutions()
             error_text = f"Invalid resolution '{actual_resolution}' for provider '{actual_provider}'. Available resolutions: {list(available_resolutions.keys())}"
             debug_print(f"[ERROR] {error_text}")
-            return [types.TextContent(type="text", text=error_text)]
+            return self._build_tool_error_result(
+                code="invalid_resolution",
+                message=error_text,
+                details={
+                    "provider": actual_provider,
+                    "resolution": actual_resolution,
+                    "available_resolutions": list(available_resolutions.keys())
+                }
+            )
 
         # Set defaults if not provided
         if not actual_style:
@@ -269,64 +458,84 @@ class MCPImageServerHTTP:
                 # Check result
                 if not result or len(result) == 0:
                     error_msg = "Image generation failed: No result"
-                    return [types.TextContent(type="text", text=error_msg)]
+                    return self._build_tool_error_result(
+                        code="generation_failed",
+                        message=error_msg
+                    )
 
                 # Check for errors
                 if "error" in result[0]:
                     error_msg = result[0]["error"]
                     debug_print(f"[ERROR] {error_msg}")
-                    return [types.TextContent(type="text", text=f"Image generation error: {error_msg}")]
+                    return self._build_tool_error_result(
+                        code="provider_error",
+                        message=f"Image generation error: {error_msg}",
+                        details={"provider": actual_provider}
+                    )
 
                 # Check image content
                 if "content" in result[0]:
                     # Base64 encoded image
                     image_data = result[0]["content"]
-
-                    # Save the image
-                    save_dir = Path(self.config.image_save_dir)
-                    save_dir.mkdir(parents=True, exist_ok=True)
-
-                    # Create filename
-                    timestamp = int(time.time())
-                    if file_prefix:
-                        safe_prefix = "".join(c if c.isalnum() or c == '_' else '_' for c in file_prefix)
-                        filename = f"{safe_prefix}_{actual_provider}_{timestamp}.jpg"
-                    else:
-                        filename = f"img_{actual_provider}_{timestamp}.jpg"
-
-                    file_path = save_dir / filename
+                    image_mime_type = result[0].get("content_type", "image/jpeg")
 
                     try:
-                        # Decode and save
+                        # Decode image first so errors are explicit and size is available.
                         image_data_bytes = base64.b64decode(image_data)
+                    except Exception as e:
+                        error_msg = f"Failed to decode image content: {str(e)}"
+                        debug_print(f"[ERROR] {error_msg}")
+                        return self._build_tool_error_result(
+                            code="decode_failed",
+                            message=error_msg,
+                            details={"provider": actual_provider}
+                        )
+
+                    # Build filename using MIME type.
+                    timestamp = int(time.time())
+                    extension = self._image_extension_from_mime(image_mime_type)
+                    if file_prefix:
+                        safe_prefix = "".join(c if c.isalnum() or c == "_" else "_" for c in file_prefix)
+                        filename = f"{safe_prefix}_{actual_provider}_{timestamp}.{extension}"
+                    else:
+                        filename = f"img_{actual_provider}_{timestamp}.{extension}"
+
+                    save_dir = Path(self.config.image_save_dir)
+                    file_path = save_dir / filename
+                    local_path: Optional[str] = None
+                    save_error: Optional[str] = None
+
+                    try:
+                        save_dir.mkdir(parents=True, exist_ok=True)
                         with open(file_path, "wb") as f:
                             f.write(image_data_bytes)
-
-                        debug_print(f"Image successfully saved to {file_path}")
-
-                        return [types.TextContent(
-                            type="text",
-                            text=f"Image successfully generated and saved to: {file_path} (Provider: {actual_provider})"
-                        )]
+                        local_path = str(file_path.resolve())
+                        debug_print(f"Image successfully saved to {local_path}")
                     except Exception as e:
-                        debug_print(f"[ERROR] Error saving image: {e}")
+                        save_error = str(e)
+                        debug_print(f"[ERROR] Failed to save image to disk: {save_error}")
 
-                        # Return image data if saving fails
-                        response = [types.ImageContent(
-                            type="image",
-                            mimeType=result[0].get("content_type", "image/jpeg"),
-                            data=image_data
-                        )]
-
-                        response.append(types.TextContent(
-                            type="text",
-                            text=f"Warning: Failed to save image to disk. Error: {str(e)} (Provider: {actual_provider})"
-                        ))
-
-                        return response
+                    image_info = {
+                        "id": f"img_{actual_provider}_{timestamp}",
+                        "provider": actual_provider,
+                        "mime_type": image_mime_type,
+                        "file_name": filename if local_path else None,
+                        "local_path": local_path,
+                        "url": None,
+                        "size_bytes": len(image_data_bytes),
+                        # Internal field used to build ImageContent, stripped from structured output.
+                        "base64_data": image_data,
+                        "revised_prompt": result[0].get("revised_prompt"),
+                        "save_error": save_error
+                    }
+                    return self._build_tool_success_result(images=[image_info])
                 else:
                     error_msg = "No image content in the generation result"
-                    return [types.TextContent(type="text", text=error_msg)]
+                    return self._build_tool_error_result(
+                        code="missing_content",
+                        message=error_msg,
+                        details={"provider": actual_provider}
+                    )
             finally:
                 if not progress_task.done():
                     progress_task.cancel()
@@ -335,7 +544,10 @@ class MCPImageServerHTTP:
             import traceback
             traceback.print_exc(file=sys.stderr)
             error_msg = f"Exception during image generation: {str(e)}"
-            return [types.TextContent(type="text", text=error_msg)]
+            return self._build_tool_error_result(
+                code="internal_error",
+                message=error_msg
+            )
 
     async def _list_resources(self) -> list[types.Resource]:
         """List available resources."""
@@ -520,8 +732,17 @@ You can specify provider:style or provider:resolution format, or let the system 
             elif method == "tools/call":
                 tool_name = params.get("name")
                 tool_arguments = params.get("arguments", {})
-                content_result = await self._call_tool(tool_name, tool_arguments)
-                result = {"content": [c.model_dump(mode='json') for c in content_result]}
+                structured_result = await self._call_tool_structured(tool_name, tool_arguments)
+                safe_structured_result = self._strip_binary_fields(structured_result)
+                content_result = self._tool_result_to_content(
+                    structured_result,
+                    text_payload=safe_structured_result
+                )
+                result = {
+                    "content": [c.model_dump(mode="json") for c in content_result],
+                    "structuredContent": safe_structured_result,
+                    "isError": not safe_structured_result.get("ok", False)
+                }
             elif method == "resources/list":
                 resources = await self._list_resources()
                 result = {"resources": [r.model_dump(mode='json') for r in resources]}

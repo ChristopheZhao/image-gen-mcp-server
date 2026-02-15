@@ -102,6 +102,101 @@ def get_combined_resolutions() -> str:
             combined[f"{provider_name}:{res_key}"] = f"{provider_name} - {res_desc}"
     return format_options(combined)
 
+
+TOOL_RESULT_VERSION = "1.0"
+
+
+def build_tool_success_result(images: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Build a successful fixed-structure tool result."""
+    return {
+        "version": TOOL_RESULT_VERSION,
+        "ok": True,
+        "images": images,
+        "error": None
+    }
+
+
+def build_tool_error_result(
+    code: str,
+    message: str,
+    details: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Build a failed fixed-structure tool result."""
+    return {
+        "version": TOOL_RESULT_VERSION,
+        "ok": False,
+        "images": [],
+        "error": {
+            "code": code,
+            "message": message,
+            "details": details or {}
+        }
+    }
+
+
+def strip_binary_fields(result: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove binary-only fields from structured payload."""
+    payload: Dict[str, Any] = {
+        "version": result.get("version"),
+        "ok": result.get("ok"),
+        "images": [],
+        "error": result.get("error")
+    }
+
+    images = result.get("images")
+    if isinstance(images, list):
+        for image in images:
+            if isinstance(image, dict):
+                payload["images"].append({
+                    key: value
+                    for key, value in image.items()
+                    if key != "base64_data"
+                })
+            else:
+                payload["images"].append(image)
+
+    return payload
+
+
+def tool_result_to_content(result: Dict[str, Any]) -> List[TextContent | ImageContent]:
+    """Convert fixed tool result to text + optional image content payload."""
+    content: List[TextContent | ImageContent] = []
+
+    text_payload = strip_binary_fields(result)
+    content.append(TextContent(type="text", text=json.dumps(text_payload, ensure_ascii=False)))
+
+    images = result.get("images", [])
+    if isinstance(images, list):
+        for image in images:
+            if not isinstance(image, dict):
+                continue
+            base64_data = image.get("base64_data")
+            if not base64_data:
+                continue
+            content.append(
+                ImageContent(
+                    type="image",
+                    data=base64_data,
+                    mimeType=image.get("mime_type", "image/jpeg")
+                )
+            )
+
+    return content
+
+
+def image_extension_from_mime(mime_type: str) -> str:
+    """Infer filename extension from image MIME type."""
+    mime = (mime_type or "").lower()
+    extension_map = {
+        "image/jpeg": "jpg",
+        "image/jpg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp",
+        "image/gif": "gif",
+        "image/bmp": "bmp"
+    }
+    return extension_map.get(mime, "img")
+
 @mcp.tool()
 async def generate_image(
     prompt: Annotated[str, Field(description="Image description text")],
@@ -123,23 +218,23 @@ async def generate_image(
         file_prefix: Optional prefix for the output filename (English only)
     """
     debug_print(f"generate_image called: prompt={prompt}, provider={provider}, style={style}, resolution={resolution}, negative_prompt={negative_prompt}, file_prefix={file_prefix}")
-    
+
     # Parse provider from style/resolution if not explicitly specified
     actual_provider = provider
     actual_style = style
     actual_resolution = resolution
-    
+
     # Parse provider:style format
     if ":" in style and not actual_provider:
         provider_from_style, actual_style = style.split(":", 1)
         actual_provider = provider_from_style
-        
+
     # Parse provider:resolution format
     if ":" in resolution and not actual_provider:
         provider_from_res, actual_resolution = resolution.split(":", 1)
         if not actual_provider:
             actual_provider = provider_from_res
-    
+
     # Use default provider if none specified
     if not actual_provider:
         actual_provider = provider_manager.default_provider
@@ -147,55 +242,87 @@ async def generate_image(
             available_providers = provider_manager.get_available_providers()
             error_text = f"No provider specified and no default provider available. Available providers: {available_providers}"
             debug_print(f"[ERROR] {error_text}")
-            return [TextContent(type="text", text=error_text)]
-    
+            return tool_result_to_content(
+                build_tool_error_result(
+                    code="provider_missing",
+                    message=error_text,
+                    details={"available_providers": available_providers}
+                )
+            )
+
     # Get the provider instance
     provider_instance = provider_manager.get_provider(actual_provider)
     if not provider_instance:
         available_providers = provider_manager.get_available_providers()
         error_text = f"Provider '{actual_provider}' not available. Available providers: {available_providers}"
         debug_print(f"[ERROR] {error_text}")
-        return [TextContent(type="text", text=error_text)]
-    
+        return tool_result_to_content(
+            build_tool_error_result(
+                code="provider_unavailable",
+                message=error_text,
+                details={
+                    "provider": actual_provider,
+                    "available_providers": available_providers
+                }
+            )
+        )
+
     # Validate style
     if actual_style and not provider_instance.validate_style(actual_style):
         available_styles = provider_instance.get_available_styles()
         error_text = f"Invalid style '{actual_style}' for provider '{actual_provider}'. Available styles: {list(available_styles.keys())}"
         debug_print(f"[ERROR] {error_text}")
-        return [TextContent(type="text", text=error_text)]
-    
+        return tool_result_to_content(
+            build_tool_error_result(
+                code="invalid_style",
+                message=error_text,
+                details={
+                    "provider": actual_provider,
+                    "style": actual_style,
+                    "available_styles": list(available_styles.keys())
+                }
+            )
+        )
+
     # Validate resolution
     if actual_resolution and not provider_instance.validate_resolution(actual_resolution):
         available_resolutions = provider_instance.get_available_resolutions()
         error_text = f"Invalid resolution '{actual_resolution}' for provider '{actual_provider}'. Available resolutions: {list(available_resolutions.keys())}"
         debug_print(f"[ERROR] {error_text}")
-        return [TextContent(type="text", text=error_text)]
-    
+        return tool_result_to_content(
+            build_tool_error_result(
+                code="invalid_resolution",
+                message=error_text,
+                details={
+                    "provider": actual_provider,
+                    "resolution": actual_resolution,
+                    "available_resolutions": list(available_resolutions.keys())
+                }
+            )
+        )
+
     # Set defaults if not provided
     if not actual_style:
         default_styles = provider_instance.get_available_styles()
         actual_style = list(default_styles.keys())[0] if default_styles else "default"
-    
+
     if not actual_resolution:
         default_resolutions = provider_instance.get_available_resolutions()
         actual_resolution = list(default_resolutions.keys())[0] if default_resolutions else "1024x1024"
-    
+
     debug_print(f"Using provider: {actual_provider}, style: {actual_style}, resolution: {actual_resolution}")
-    
+
     try:
-        # Add a timed print task, print progress reminder every 5 seconds
         async def print_progress():
             count = 0
             while True:
                 count += 1
                 debug_print(f"[Progress] Generating image with {actual_provider}... waited {count*5} seconds")
                 await asyncio.sleep(5)
-        
-        # Start progress print task
+
         progress_task = asyncio.create_task(print_progress())
-        
+
         try:
-            # Call image generation through provider manager
             debug_print(f"Calling {actual_provider} provider...")
             result = await provider_manager.generate_images(
                 query=prompt,
@@ -204,91 +331,113 @@ async def generate_image(
                 resolution=actual_resolution,
                 negative_prompt=negative_prompt
             )
-            
-            # Cancel progress print task
+
             progress_task.cancel()
             try:
                 await progress_task
             except asyncio.CancelledError:
                 pass
-            
+
             debug_print(f"Image generation completed, result type: {type(result)}")
-            
-            # Check result
+
             if not result or len(result) == 0:
-                error_msg = "Image generation failed: No result"
-                return [TextContent(type="text", text=error_msg)]
-                
-            # Check for errors
+                return tool_result_to_content(
+                    build_tool_error_result(
+                        code="generation_failed",
+                        message="Image generation failed: No result"
+                    )
+                )
+
             if "error" in result[0]:
                 error_msg = result[0]["error"]
-                debug_print(f"[DEBUG] Processed error message: {error_msg}")
-                return [TextContent(type="text", text=f"Image generation error: {error_msg}")]
-                
-            # Check image content
-            if "content" in result[0]:
-                # This is Base64 encoded image
-                image_data = result[0]["content"]
-                
-                # Save the image
-                save_dir = Path(DEFAULT_SAVE_DIR)
-                save_dir.mkdir(parents=True, exist_ok=True)
-                
-                # Create filename
-                timestamp = int(time.time())
-                if file_prefix:
-                    safe_prefix = "".join(c if c.isalnum() or c == '_' else '_' for c in file_prefix)
-                    filename = f"{safe_prefix}_{actual_provider}_{timestamp}.jpg"
-                else:
-                    filename = f"img_{actual_provider}_{timestamp}.jpg"
-                
-                file_path = save_dir / filename
-                
-                try:
-                    # Decode base64 data and save to file
-                    image_data_bytes = base64.b64decode(image_data)
-                    with open(file_path, "wb") as f:
-                        f.write(image_data_bytes)
-                    
-                    debug_print(f"[DEBUG] Image successfully saved to {file_path}")
-                    
-                    # Return the path to the saved image
-                    provider_info = f" (Provider: {actual_provider})"
-                    return [TextContent(
-                        type="text",
-                        text=f"Image successfully generated and saved to: {file_path}{provider_info}"
-                    )]
-                except Exception as e:
-                    debug_print(f"[ERROR] Error saving image: {e}")
-                    import traceback
-                    traceback.print_exc(file=sys.stderr)
-                    
-                    # Still return the image data if saving fails
-                    response = [ImageContent(
-                        type="image", 
-                        mimeType=result[0].get("content_type", "image/jpeg"), 
-                        data=image_data
-                    )]
-                    
-                    response.append(TextContent(
-                        type="text",
-                        text=f"Warning: Failed to save image to disk. Error: {str(e)} (Provider: {actual_provider})"
-                    ))
-                    
-                    return response
+                debug_print(f"[ERROR] {error_msg}")
+                return tool_result_to_content(
+                    build_tool_error_result(
+                        code="provider_error",
+                        message=f"Image generation error: {error_msg}",
+                        details={"provider": actual_provider}
+                    )
+                )
+
+            if "content" not in result[0]:
+                return tool_result_to_content(
+                    build_tool_error_result(
+                        code="missing_content",
+                        message="No image content in the generation result",
+                        details={"provider": actual_provider}
+                    )
+                )
+
+            image_data = result[0]["content"]
+            image_mime_type = result[0].get("content_type", "image/jpeg")
+
+            try:
+                image_data_bytes = base64.b64decode(image_data)
+            except Exception as e:
+                error_msg = f"Failed to decode image content: {str(e)}"
+                debug_print(f"[ERROR] {error_msg}")
+                return tool_result_to_content(
+                    build_tool_error_result(
+                        code="decode_failed",
+                        message=error_msg,
+                        details={"provider": actual_provider}
+                    )
+                )
+
+            timestamp = int(time.time())
+            extension = image_extension_from_mime(image_mime_type)
+            if file_prefix:
+                safe_prefix = "".join(c if c.isalnum() or c == "_" else "_" for c in file_prefix)
+                filename = f"{safe_prefix}_{actual_provider}_{timestamp}.{extension}"
             else:
-                error_msg = "No image content in the image generation result"
-                return [TextContent(type="text", text=error_msg)]
+                filename = f"img_{actual_provider}_{timestamp}.{extension}"
+
+            save_dir = Path(DEFAULT_SAVE_DIR)
+            file_path = save_dir / filename
+            local_path: Optional[str] = None
+            save_error: Optional[str] = None
+
+            try:
+                save_dir.mkdir(parents=True, exist_ok=True)
+                with open(file_path, "wb") as f:
+                    f.write(image_data_bytes)
+                local_path = str(file_path.resolve())
+                debug_print(f"[DEBUG] Image successfully saved to {local_path}")
+            except Exception as e:
+                save_error = str(e)
+                debug_print(f"[ERROR] Failed to save image to disk: {save_error}")
+
+            image_info = {
+                "id": f"img_{actual_provider}_{timestamp}",
+                "provider": actual_provider,
+                "mime_type": image_mime_type,
+                "file_name": filename if local_path else None,
+                "local_path": local_path,
+                "url": None,
+                "size_bytes": len(image_data_bytes),
+                # Internal field used to build ImageContent, stripped from text payload.
+                "base64_data": image_data,
+                "revised_prompt": result[0].get("revised_prompt"),
+                "save_error": save_error
+            }
+
+            return tool_result_to_content(
+                build_tool_success_result(images=[image_info])
+            )
         finally:
-            # Ensure progress task is cancelled
             if not progress_task.done():
                 progress_task.cancel()
-                
+
     except Exception as e:
         import traceback
         traceback.print_exc(file=sys.stderr)
         error_msg = f"Exception occurred during image generation: {str(e)}"
-        return [TextContent(type="text", text=error_msg)]
+        return tool_result_to_content(
+            build_tool_error_result(
+                code="internal_error",
+                message=error_msg
+            )
+        )
 
 @mcp.prompt()
 def image_generation_prompt(

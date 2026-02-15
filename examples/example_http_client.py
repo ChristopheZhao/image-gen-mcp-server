@@ -251,19 +251,29 @@ class MCPHTTPClient:
             if result['type'] == 'text':
                 text = result['text']
 
-                if 'successfully generated' in text.lower() or '成功' in text:
-                    print(f"✅ 图像生成成功！")
-                    print(f"   {text}")
-                    return True
-                else:
-                    print(f"❌ 图像生成失败:")
+                try:
+                    payload = json.loads(text)
+                except Exception:
+                    print(f"❌ 非结构化返回:")
                     print(f"   {text}")
                     return False
-            elif result['type'] == 'image':
-                print(f"✅ 收到图像数据")
-                print(f"   类型: {result['mimeType']}")
-                print(f"   大小: {len(result['data'])} bytes")
-                return True
+
+                if payload.get("ok"):
+                    images = payload.get("images", [])
+                    image = images[0] if images else {}
+                    print(f"✅ 图像生成成功！")
+                    print(f"   provider: {image.get('provider')}")
+                    print(f"   local_path: {image.get('local_path')}")
+                    print(f"   mime_type: {image.get('mime_type')}")
+                    if image.get("save_error"):
+                        print(f"   ⚠️ save_error: {image.get('save_error')}")
+                    return True
+
+                error = payload.get("error") or {}
+                print(f"❌ 图像生成失败:")
+                print(f"   code: {error.get('code')}")
+                print(f"   message: {error.get('message')}")
+                return False
             else:
                 print(f"❌ 未知的返回类型: {result['type']}")
                 return False
