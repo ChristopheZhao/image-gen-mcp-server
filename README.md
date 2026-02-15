@@ -103,6 +103,10 @@ Create a `.env` file in the project root. See `.env.example` for all available o
 MCP_IMAGE_SAVE_DIR=./generated_images
 # Public base URL for generated image links (HTTP mode, optional but recommended)
 # MCP_PUBLIC_BASE_URL=https://mcp.your-domain.com
+# Metadata TTL for get_image_data cache (seconds)
+# MCP_IMAGE_RECORD_TTL=86400
+# Max bytes allowed in get_image_data base64 response
+# MCP_GET_IMAGE_DATA_MAX_BYTES=10485760
 
 # API Provider Credentials (configure at least one)
 TENCENT_SECRET_ID=your_tencent_secret_id
@@ -193,6 +197,10 @@ Server will start on `http://127.0.0.1:8000` with endpoints:
 If server is exposed through reverse proxy/public domain, set `MCP_PUBLIC_BASE_URL` to ensure URL is externally reachable.
 `/images/*` is intentionally public so browser/front-end image rendering works even when MCP API auth is enabled.
 
+Best-practice agent flow:
+1. Call `generate_image` to get renderable image + stable `image_id`/`url`.
+2. Call `get_image_data(image_id=...)` only when programmable base64 text is required.
+
 #### 3. Test HTTP Server
 ```bash
 # Check server health
@@ -228,6 +236,7 @@ You can connect from MCP-compatible client(recommand cursor now). The server pro
 
 #### Tools
 - `generate_image` - Generate images based on prompt, style, and resolution
+- `get_image_data` - Fetch base64 text for a previously generated image by `image_id`
 
 #### Prompts
 - `image_generation_prompt` - Create image generation prompt templates
