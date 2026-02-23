@@ -109,6 +109,8 @@ poetry.lock
 # VSCode/Cursor
 .vscode/
 .cursor/
+.claude/
+.codex/
 
 # OS files
 .DS_Store

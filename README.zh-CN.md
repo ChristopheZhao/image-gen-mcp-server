@@ -1,6 +1,6 @@
 # MCP 图像生成服务
 
-一个基于 Model Context Protocol (MCP) 的图像生成服务，支持多个主流AI提供商，包括腾讯混元、OpenAI DALL-E 3 和豆包 API。
+一个基于 Model Context Protocol (MCP) 的图像生成服务，支持多个主流AI提供商，包括腾讯混元、OpenAI GPT Image 和豆包 API。
 
 **版本**: 0.2.0
 
@@ -8,7 +8,7 @@
 
 ### 🎯 多API提供商支持
 - **腾讯混元**: 18种艺术风格，中文优化
-- **OpenAI DALL-E 3**: 高质量图像生成，英文优化
+- **OpenAI GPT Image**: 高质量图像生成，英文优化
 - **豆包（字节跳动）**: 平衡的质量和速度，12种风格
 
 ### 🚀 核心功能
@@ -110,8 +110,9 @@ MCP_IMAGE_SAVE_DIR=./generated_images
 TENCENT_SECRET_ID=你的腾讯云SecretId
 TENCENT_SECRET_KEY=你的腾讯云SecretKey
 OPENAI_API_KEY=你的OpenAI密钥
-DOUBAO_ACCESS_KEY=你的豆包AccessKey
-DOUBAO_SECRET_KEY=你的豆包SecretKey
+DOUBAO_API_KEY=你的豆包API Key
+# 可选但推荐：当配置多个 provider 时设置默认提供商
+# MCP_DEFAULT_PROVIDER=openai
 ```
 
 #### 传输配置（可选）
@@ -287,9 +288,9 @@ generate_image(
 - **分辨率**: 8种选项，从 `768:768` 到 `1280:720`
 - **特色**: 中文优化，丰富的艺术风格
 
-#### OpenAI DALL-E 3
+#### OpenAI GPT Image
 - **风格**: 12种选项，包括 `natural`、`vivid`、`realistic`、`artistic`、`anime`
-- **分辨率**: 7种选项，包括超高分辨率 `1792x1024`
+- **分辨率**: 3种选项：`1024x1024`、`1536x1024`、`1024x1536`
 - **特色**: 高质量输出，英文优化
 
 #### 豆包（字节跳动）
@@ -339,8 +340,8 @@ generate_image(
         "TENCENT_SECRET_ID", 
         "TENCENT_SECRET_KEY",
         "OPENAI_API_KEY",
-        "DOUBAO_ACCESS_KEY",
-        "DOUBAO_SECRET_KEY",
+        "DOUBAO_API_KEY",
+        "MCP_DEFAULT_PROVIDER",
         "MCP_IMAGE_SAVE_DIR"
       ],
       "autoRestart": true,
@@ -363,13 +364,16 @@ generate_image(
 - `TENCENT_SECRET_ID`: 你的腾讯云 API Secret ID
 - `TENCENT_SECRET_KEY`: 你的腾讯云 API Secret Key
 - `OPENAI_API_KEY`: 你的 OpenAI API 密钥
-- `DOUBAO_ACCESS_KEY`: 你的豆包 Access Key
-- `DOUBAO_SECRET_KEY`: 你的豆包 Secret Key
+- `DOUBAO_API_KEY`: 你的豆包 API Key（Ark）
 - `MCP_IMAGE_SAVE_DIR`: 图片保存的位置，例如: D:\data\mcp_img
 - `OPENAI_BASE_URL`: （可选）自定义 OpenAI 端点
+- `OPENAI_MODEL`: （可选）OpenAI 生图模型，默认：`gpt-image-1.5`
 - `DOUBAO_ENDPOINT`: （可选）自定义豆包端点
+- `DOUBAO_MODEL`: （可选）豆包主模型，默认：`doubao-seedream-4.5`
+- `DOUBAO_FALLBACK_MODEL`: （可选）豆包回退模型，默认：`doubao-seedream-4.0`
+- `MCP_DEFAULT_PROVIDER`: （可选但推荐，尤其是多 provider 场景）请求未指定 provider 时默认使用哪个。可选：`hunyuan`、`openai`、`doubao`
 
-**注意**: 你只需要配置想要使用的提供商的API密钥。系统会自动检测可用的提供商。
+**注意**: 你只需要配置想要使用的提供商。若配置了多个 provider，建议设置 `MCP_DEFAULT_PROVIDER`，避免隐式路由顺序。运行中修改 `.env` 模型/默认提供商配置后，可调用 `reload_config` 热更新生效；如果修改了 `MCP_PORT` 等非热更新项，仍需要重启服务。
 
 ### 🎯 在Cursor中使用多API
 
@@ -493,7 +497,7 @@ python test_mcp_server.py --with-api
 
 #### 支持的API
 1. **腾讯混元图像生成API**（原版）
-2. **OpenAI DALL-E 3 API**（新增）
+2. **OpenAI GPT Image API**（新增）
 3. **豆包图像生成API**（新增）
 
 #### 统一MCP资源
@@ -505,6 +509,8 @@ python test_mcp_server.py --with-api
 
 #### 增强的MCP工具
 - `generate_image` - 具有智能路由的多提供商图像生成
+- `get_image_data` - 通过图片 id 获取已生成图片的 base64 文本数据
+- `reload_config` - 无需重启进程重载运行时配置/模型（仅支持安全子集）
 
 ### 腾讯混元生图 API
 
@@ -525,7 +531,7 @@ python test_mcp_server.py --with-api
 - [API 文档](https://cloud.tencent.com/document/api/1729/105970)
 - [计费说明](https://cloud.tencent.com/document/product/1729/105925)
 
-### OpenAI DALL-E 3 API
+### OpenAI GPT Image API
 
 #### API特性
 - 高质量图像生成
@@ -545,7 +551,7 @@ python test_mcp_server.py --with-api
 
 - **v0.2.0 版本**（当前）
   - ✅ 腾讯混元图像生成API
-  - ✅ OpenAI DALL-E 3 API集成
+  - ✅ OpenAI GPT Image API集成
   - ✅ 豆包API集成
   - ✅ 多提供商管理系统
   - ✅ 智能提供商选择

@@ -1,6 +1,6 @@
 # MCP Image Generation Server
 
-A Model Context Protocol (MCP) server for image generation using multiple AI providers including Tencent Hunyuan, OpenAI DALL-E 3, and Doubao APIs.
+A Model Context Protocol (MCP) server for image generation using multiple AI providers including Tencent Hunyuan, OpenAI GPT Image, and Doubao APIs.
 
 **Version**: 0.2.0
 
@@ -8,7 +8,7 @@ A Model Context Protocol (MCP) server for image generation using multiple AI pro
 
 ### 🎯 Multi-API Provider Support
 - **Tencent Hunyuan**: 18 artistic styles with Chinese optimization
-- **OpenAI DALL-E 3**: High-quality image generation with English optimization
+- **OpenAI GPT Image**: High-quality image generation with English optimization
 - **Doubao (ByteDance)**: Balanced quality and speed with 12 styles
 
 ### 🚀 Core Features
@@ -112,8 +112,9 @@ MCP_IMAGE_SAVE_DIR=./generated_images
 TENCENT_SECRET_ID=your_tencent_secret_id
 TENCENT_SECRET_KEY=your_tencent_secret_key
 OPENAI_API_KEY=your_openai_api_key
-DOUBAO_ACCESS_KEY=your_doubao_access_key
-DOUBAO_SECRET_KEY=your_doubao_secret_key
+DOUBAO_API_KEY=your_doubao_api_key
+# Optional but recommended when multiple providers are configured
+# MCP_DEFAULT_PROVIDER=openai
 ```
 
 #### Transport Configuration (Optional)
@@ -288,9 +289,9 @@ generate_image(
 - **Resolutions**: 8 options from `768:768` to `1280:720`
 - **Specialty**: Chinese-optimized, rich artistic styles
 
-#### OpenAI DALL-E 3
+#### OpenAI GPT Image
 - **Styles**: 12 options including `natural`, `vivid`, `realistic`, `artistic`, `anime`
-- **Resolutions**: 7 options including ultra-high resolution `1792x1024`
+- **Resolutions**: 3 options: `1024x1024`, `1536x1024`, `1024x1536`
 - **Specialty**: High-quality output, English optimization
 
 #### Doubao (ByteDance)
@@ -320,7 +321,7 @@ To add this MCP server in Cursor:
       "type": "stdio",
       "command": "D:\\your_path\\image-gen-mcp-server\\.venv\\Scripts\\python.exe",
       "args": ["-m", "mcp_image_server"],
-      "environment": ["TENCENT_SECRET_ID", "TENCENT_SECRET_KEY", "OPENAI_API_KEY", "DOUBAO_API_KEY", "MCP_IMAGE_SAVE_DIR"],
+      "environment": ["TENCENT_SECRET_ID", "TENCENT_SECRET_KEY", "OPENAI_API_KEY", "DOUBAO_API_KEY", "MCP_DEFAULT_PROVIDER", "MCP_IMAGE_SAVE_DIR"],
       "autoRestart": true,
       "startupTimeoutMs": 30000
     }
@@ -343,13 +344,16 @@ When configuring the MCP server in Cursor, set the following environment variabl
 - `TENCENT_SECRET_ID`: Your Tencent Cloud API Secret ID
 - `TENCENT_SECRET_KEY`: Your Tencent Cloud API Secret Key
 - `OPENAI_API_KEY`: Your OpenAI API Key
-- `DOUBAO_ACCESS_KEY`: Your Doubao Access Key
-- `DOUBAO_SECRET_KEY`: Your Doubao Secret Key
+- `DOUBAO_API_KEY`: Your Doubao API Key (Ark)
 - `MCP_IMAGE_SAVE_DIR`: Your save image dir, e.g.: D:\data\mcp_img
 - `OPENAI_BASE_URL`: (Optional) Custom OpenAI endpoint
+- `OPENAI_MODEL`: (Optional) OpenAI image model, default: `gpt-image-1.5`
 - `DOUBAO_ENDPOINT`: (Optional) Custom Doubao endpoint
+- `DOUBAO_MODEL`: (Optional) Doubao primary model, default: `doubao-seedream-4.5`
+- `DOUBAO_FALLBACK_MODEL`: (Optional) Doubao fallback model, default: `doubao-seedream-4.0`
+- `MCP_DEFAULT_PROVIDER`: (Optional but recommended when multiple providers are enabled) default provider to use when request does not specify one. Allowed: `hunyuan`, `openai`, `doubao`
 
-**Note**: You only need to configure the API keys for the providers you want to use. The system will automatically detect available providers.
+**Note**: You only need to configure providers you want to use. When multiple providers are configured, set `MCP_DEFAULT_PROVIDER` to avoid implicit routing order. After changing `.env` model/default-provider settings at runtime, call `reload_config` to apply without restart (or restart server if you changed non hot-reloadable fields like `MCP_PORT`).
 
 ### 🎯 Multi-API Usage in Cursor
 
@@ -484,7 +488,7 @@ The project now supports multiple image generation APIs through a unified interf
 
 #### Supported APIs
 1. **Tencent Hunyuan Image Generation API** (Original)
-2. **OpenAI DALL-E 3 API** (New)
+2. **OpenAI GPT Image API** (New)
 3. **Doubao Image Generation API** (New)
 
 #### Unified MCP Resources
@@ -496,6 +500,8 @@ The project now supports multiple image generation APIs through a unified interf
 
 #### Enhanced MCP Tools
 - `generate_image` - Multi-provider image generation with intelligent routing
+- `get_image_data` - Retrieve base64 text data for a generated image by id
+- `reload_config` - Reload runtime config/models from env/.env without process restart (safe subset only)
 
 ### Tencent Hunyuan Image Generation API
 
@@ -516,7 +522,7 @@ For detailed API documentation and pricing, please refer to:
 - [API Documentation](https://cloud.tencent.com/document/api/1729/105970)
 - [Pricing Details](https://cloud.tencent.com/document/product/1729/105925) 
 
-### OpenAI DALL-E 3 API
+### OpenAI GPT Image API
 
 #### API Features
 - High-quality image generation
@@ -536,7 +542,7 @@ For detailed API documentation and pricing, please refer to:
 
 - **Version 0.2.0** (Current)
   - ✅ Tencent Hunyuan image generation API
-  - ✅ OpenAI DALL-E 3 API integration
+  - ✅ OpenAI GPT Image API integration
   - ✅ Doubao API integration
   - ✅ Multi-provider management system
   - ✅ Intelligent provider selection
