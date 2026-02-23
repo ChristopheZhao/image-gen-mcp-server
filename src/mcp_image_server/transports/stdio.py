@@ -10,6 +10,7 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 from mcp.types import TextContent, ImageContent
 from ..providers import ProviderManager
+from ..config import ServerConfig
 
 from dotenv import load_dotenv
 from pydantic import Field
@@ -37,8 +38,27 @@ except Exception as e:
 DEFAULT_SAVE_DIR = image_save_dir or os.getenv("MCP_IMAGE_SAVE_DIR", "./generated_images")
 debug_print(f"Images will be saved to: {DEFAULT_SAVE_DIR}")
 
+RELOADABLE_CONFIG_FIELDS = frozenset(
+    {
+        "tencent_secret_id",
+        "tencent_secret_key",
+        "openai_api_key",
+        "openai_base_url",
+        "openai_model",
+        "doubao_api_key",
+        "doubao_endpoint",
+        "doubao_model",
+        "doubao_fallback_model",
+        "default_provider",
+        "public_base_url",
+        "image_record_ttl",
+        "get_image_data_max_bytes",
+    }
+)
+
 # Initialize provider manager
-provider_manager = ProviderManager()
+runtime_config = ServerConfig()
+provider_manager = ProviderManager(config=runtime_config)
 
 # Register providers and their styles/resolutions as MCP resources
 @mcp.resource("providers://list")
@@ -104,6 +124,75 @@ def get_combined_resolutions() -> str:
 
 
 TOOL_RESULT_VERSION = "1.0"
+
+
+def build_reload_result(
+    ok: bool,
+    result: Optional[Dict[str, Any]] = None,
+    code: Optional[str] = None,
+    message: Optional[str] = None,
+    details: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Build fixed-structure result for reload_config tool."""
+    error_payload = None
+    if not ok:
+        error_payload = {
+            "code": code or "reload_failed",
+            "message": message or "Failed to reload configuration",
+            "details": details or {},
+        }
+    return {
+        "version": TOOL_RESULT_VERSION,
+        "ok": ok,
+        "result": result,
+        "error": error_payload,
+    }
+
+
+def mask_config_value(field_name: str, value: Any) -> Any:
+    """Mask sensitive values in diagnostics."""
+    lowered = field_name.lower()
+    if any(token in lowered for token in ("secret", "token", "key", "password")):
+        if value is None:
+            return None
+        return "<set>" if str(value).strip() else "<empty>"
+    return value
+
+
+def collect_changed_config_fields(old_config: ServerConfig, new_config: ServerConfig) -> Dict[str, Dict[str, Any]]:
+    """Collect changed field diffs with masked before/after values."""
+    changed: Dict[str, Dict[str, Any]] = {}
+    for field_name in ServerConfig.model_fields.keys():
+        old_value = getattr(old_config, field_name)
+        new_value = getattr(new_config, field_name)
+        if old_value != new_value:
+            changed[field_name] = {
+                "before": mask_config_value(field_name, old_value),
+                "after": mask_config_value(field_name, new_value),
+            }
+    return changed
+
+
+def summarize_provider_models() -> Dict[str, Any]:
+    """Return currently active provider model mapping."""
+    summary: Dict[str, Any] = {}
+    openai_provider = provider_manager.get_provider("openai")
+    if openai_provider:
+        summary["openai"] = {
+            "model": getattr(openai_provider, "model", None)
+        }
+    doubao_provider = provider_manager.get_provider("doubao")
+    if doubao_provider:
+        summary["doubao"] = {
+            "model": getattr(doubao_provider, "model", None),
+            "fallback_model": getattr(doubao_provider, "fallback_model", None),
+        }
+    return summary
+
+
+def reload_result_to_content(result: Dict[str, Any]) -> List[TextContent]:
+    """Convert reload result to a text-only MCP content payload."""
+    return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
 
 
 def build_tool_success_result(images: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -438,6 +527,94 @@ async def generate_image(
                 message=error_msg
             )
         )
+
+@mcp.tool()
+async def reload_config(
+    dotenv_override: Annotated[bool, Field(description="Whether to force-refresh environment values from .env before reload")] = True
+):
+    """
+    Reload runtime configuration without process restart.
+
+    Only a safe subset of fields is hot-reloadable (mainly provider credentials/models).
+    """
+    global runtime_config, provider_manager
+
+    if not isinstance(dotenv_override, bool):
+        return reload_result_to_content(
+            build_reload_result(
+                ok=False,
+                code="invalid_arguments",
+                message="dotenv_override must be a boolean",
+                details={"dotenv_override": dotenv_override}
+            )
+        )
+
+    if dotenv_override:
+        load_dotenv(override=True)
+
+    try:
+        new_config = ServerConfig()
+        new_config.validate_transport_config()
+    except Exception as e:
+        return reload_result_to_content(
+            build_reload_result(
+                ok=False,
+                code="invalid_config",
+                message=f"Failed to parse configuration: {e}",
+            )
+        )
+
+    changed_fields = collect_changed_config_fields(runtime_config, new_config)
+    changed_names = sorted(changed_fields.keys())
+    restart_required_fields = sorted(
+        name for name in changed_names if name not in RELOADABLE_CONFIG_FIELDS
+    )
+    if restart_required_fields:
+        return reload_result_to_content(
+            build_reload_result(
+                ok=False,
+                code="restart_required",
+                message=(
+                    "Configuration includes non hot-reloadable changes. "
+                    "Please restart the MCP server."
+                ),
+                details={
+                    "changed_fields": changed_names,
+                    "restart_required_fields": restart_required_fields,
+                    "field_diffs": changed_fields,
+                }
+            )
+        )
+
+    try:
+        new_provider_manager = ProviderManager(config=new_config)
+    except Exception as e:
+        return reload_result_to_content(
+            build_reload_result(
+                ok=False,
+                code="invalid_config",
+                message=f"Failed to initialize providers from configuration: {e}",
+            )
+        )
+
+    runtime_config = new_config
+    provider_manager = new_provider_manager
+    debug_print(
+        "[INFO] Runtime config reloaded. "
+        f"changed_fields={changed_names}, providers={provider_manager.get_available_providers()}"
+    )
+    return reload_result_to_content(
+        build_reload_result(
+            ok=True,
+            result={
+                "changed_fields": changed_names,
+                "providers": provider_manager.get_available_providers(),
+                "default_provider": provider_manager.default_provider,
+                "provider_models": summarize_provider_models(),
+                "restart_required_fields": [],
+            }
+        )
+    )
 
 @mcp.prompt()
 def image_generation_prompt(

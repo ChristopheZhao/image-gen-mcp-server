@@ -5,10 +5,9 @@ This module provides a centralized configuration system using Pydantic BaseSetti
 supporting both environment variables and .env files.
 """
 
-import os
 from typing import List, Literal, Optional
 from urllib.parse import urlparse
-from pydantic import Field, AliasChoices
+from pydantic import Field, AliasChoices, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -113,6 +112,15 @@ class ServerConfig(BaseSettings):
     )
 
     # ========== Provider Configuration ==========
+    default_provider: Optional[str] = Field(
+        default=None,
+        description=(
+            "Preferred default provider when multiple providers are configured "
+            "(hunyuan, openai, doubao)"
+        ),
+        validation_alias=AliasChoices('MCP_DEFAULT_PROVIDER', 'default_provider')
+    )
+
     # Tencent Hunyuan
     tencent_secret_id: Optional[str] = Field(
         default=None,
@@ -126,10 +134,10 @@ class ServerConfig(BaseSettings):
         validation_alias=AliasChoices('TENCENT_SECRET_KEY', 'tencent_secret_key')
     )
 
-    # OpenAI DALL-E
+    # OpenAI image generation
     openai_api_key: Optional[str] = Field(
         default=None,
-        description="OpenAI API key for DALL-E 3",
+        description="OpenAI API key for image generation",
         validation_alias=AliasChoices('OPENAI_API_KEY', 'openai_api_key')
     )
 
@@ -137,6 +145,12 @@ class ServerConfig(BaseSettings):
         default=None,
         description="Custom OpenAI API base URL (optional)",
         validation_alias=AliasChoices('OPENAI_BASE_URL', 'openai_base_url')
+    )
+
+    openai_model: str = Field(
+        default="gpt-image-1.5",
+        description="OpenAI image generation model (recommended: gpt-image-1.5; supports GPT Image family such as gpt-image-1, gpt-image-1-mini)",
+        validation_alias=AliasChoices('OPENAI_MODEL', 'openai_model')
     )
 
     # Doubao (ByteDance) - New Ark API
@@ -153,9 +167,15 @@ class ServerConfig(BaseSettings):
     )
 
     doubao_model: str = Field(
-        default="doubao-seedream-4.0",
-        description="Doubao model name (doubao-seedream-4.0, doubao-seedream-4.5, etc.)",
+        default="doubao-seedream-4.5",
+        description="Doubao primary model name (recommended: doubao-seedream-4.5)",
         validation_alias=AliasChoices('DOUBAO_MODEL', 'doubao_model')
+    )
+
+    doubao_fallback_model: str = Field(
+        default="doubao-seedream-4.0",
+        description="Doubao fallback model name used when primary model is unavailable",
+        validation_alias=AliasChoices('DOUBAO_FALLBACK_MODEL', 'doubao_fallback_model')
     )
 
     # ========== Logging Configuration ==========
@@ -192,6 +212,15 @@ class ServerConfig(BaseSettings):
         """Check if authentication is enabled."""
         return self.auth_token is not None and len(self.auth_token) > 0
 
+    @field_validator("default_provider")
+    @classmethod
+    def _normalize_default_provider(cls, value: Optional[str]) -> Optional[str]:
+        """Normalize default provider input from env/config."""
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        return normalized or None
+
     def get_provider_credentials(self) -> dict:
         """
         Get all provider credentials as a dictionary.
@@ -212,7 +241,8 @@ class ServerConfig(BaseSettings):
         if self.openai_api_key:
             credentials["openai"] = {
                 "api_key": self.openai_api_key,
-                "base_url": self.openai_base_url
+                "base_url": self.openai_base_url,
+                "model": self.openai_model
             }
 
         # Doubao credentials (New Ark API)
@@ -220,7 +250,8 @@ class ServerConfig(BaseSettings):
             credentials["doubao"] = {
                 "api_key": self.doubao_api_key,
                 "endpoint": self.doubao_endpoint,
-                "model": self.doubao_model
+                "model": self.doubao_model,
+                "fallback_model": self.doubao_fallback_model
             }
 
         return credentials
@@ -270,6 +301,7 @@ class ServerConfig(BaseSettings):
             f"host={self.host if self.is_http_transport() else 'N/A'}, "
             f"port={self.port if self.is_http_transport() else 'N/A'}, "
             f"auth_enabled={self.auth_enabled()}, "
+            f"default_provider={self.default_provider or 'auto'}, "
             f"public_base_url={'configured' if self.public_base_url else 'auto'}, "
             f"image_record_ttl={self.image_record_ttl}, "
             f"get_image_data_max_bytes={self.get_image_data_max_bytes}, "
