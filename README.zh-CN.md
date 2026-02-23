@@ -277,7 +277,7 @@ generate_image(
     prompt="音乐家的艺术肖像",
     provider="openai",
     style="artistic",
-    resolution="1792x1024"
+    resolution="1536x1024"
 )
 ```
 
@@ -300,145 +300,20 @@ generate_image(
 
 ### Cursor 集成
 
-1. 打开 Cursor
-2. 进入 Settings > Features > MCP
-3. 点击"+ Add New MCP Server"
-4. 填写配置：
-   - **Name**: `多API图像生成服务`（或自定义）
-   - **Type**: `stdio`
-   - **Command**: Python 解释器和脚本的绝对路径
+集成配置步骤与 JSON 示例请参考：
+- [docs/VSCODE_INTEGRATION.md](docs/VSCODE_INTEGRATION.md)
 
-#### 单API配置（原版）
-```json
-{
-  "mcpServers": {
-    "image-generation": {
-      "name": "图像生成服务",
-      "description": "使用腾讯混元API的图像生成服务",
-      "type": "stdio",
-      "command": "D:\\your_path\\image-gen-mcp-server\\.venv\\Scripts\\python.exe",
-      "args": ["D:\\your_path\\image-gen-mcp-server\\mcp_image_server.py"],
-      "environment": ["TENCENT_SECRET_ID", "TENCENT_SECRET_KEY","MCP_IMAGE_SAVE_DIR"],
-      "autoRestart": true,
-      "startupTimeoutMs": 30000
-    }
-  }
-}
-```
+推荐最小环境变量：
+- `MCP_IMAGE_SAVE_DIR`
+- 你实际使用的 provider 凭证：
+`TENCENT_SECRET_ID` + `TENCENT_SECRET_KEY`、`OPENAI_API_KEY`、`DOUBAO_API_KEY`
 
-#### 多API配置（推荐）
-```json
-{
-  "mcpServers": {
-    "multi-image-generation": {
-      "name": "多API图像生成服务",
-      "description": "使用混元、OpenAI和豆包API的多提供商图像生成服务",
-      "type": "stdio",
-      "command": "D:\\your_path\\image-gen-mcp-server\\.venv\\Scripts\\python.exe",
-      "args": ["D:\\your_path\\image-gen-mcp-server\\mcp_image_server_multi.py"],
-      "environment": [
-        "TENCENT_SECRET_ID", 
-        "TENCENT_SECRET_KEY",
-        "OPENAI_API_KEY",
-        "DOUBAO_API_KEY",
-        "MCP_DEFAULT_PROVIDER",
-        "MCP_IMAGE_SAVE_DIR"
-      ],
-      "autoRestart": true,
-      "startupTimeoutMs": 30000
-    }
-  }
-}
-```
+可选 provider/model 控制项：
+- `OPENAI_BASE_URL`、`OPENAI_MODEL`
+- `DOUBAO_ENDPOINT`、`DOUBAO_MODEL`、`DOUBAO_FALLBACK_MODEL`
+- `MCP_DEFAULT_PROVIDER`（多 provider 场景推荐）
 
-#### 环境变量
-
-在 Cursor 配置 MCP server 时，设置以下环境变量：
-
-**单API配置（仅混元）**:
-- `TENCENT_SECRET_ID`: 你的腾讯云 API Secret ID
-- `TENCENT_SECRET_KEY`: 你的腾讯云 API Secret Key
-- `MCP_IMAGE_SAVE_DIR`: 图片保存的位置，例如: D:\data\mcp_img
-
-**多API配置（所有提供商）**:
-- `TENCENT_SECRET_ID`: 你的腾讯云 API Secret ID
-- `TENCENT_SECRET_KEY`: 你的腾讯云 API Secret Key
-- `OPENAI_API_KEY`: 你的 OpenAI API 密钥
-- `DOUBAO_API_KEY`: 你的豆包 API Key（Ark）
-- `MCP_IMAGE_SAVE_DIR`: 图片保存的位置，例如: D:\data\mcp_img
-- `OPENAI_BASE_URL`: （可选）自定义 OpenAI 端点
-- `OPENAI_MODEL`: （可选）OpenAI 生图模型，默认：`gpt-image-1.5`
-- `DOUBAO_ENDPOINT`: （可选）自定义豆包端点
-- `DOUBAO_MODEL`: （可选）豆包主模型，默认：`doubao-seedream-4.5`
-- `DOUBAO_FALLBACK_MODEL`: （可选）豆包回退模型，默认：`doubao-seedream-4.0`
-- `MCP_DEFAULT_PROVIDER`: （可选但推荐，尤其是多 provider 场景）请求未指定 provider 时默认使用哪个。可选：`hunyuan`、`openai`、`doubao`
-
-**注意**: 你只需要配置想要使用的提供商。若配置了多个 provider，建议设置 `MCP_DEFAULT_PROVIDER`，避免隐式路由顺序。运行中修改 `.env` 模型/默认提供商配置后，可调用 `reload_config` 热更新生效；如果修改了 `MCP_PORT` 等非热更新项，仍需要重启服务。
-
-### 🎯 在Cursor中使用多API
-
-使用多API服务器时，你可以在Cursor中用自然语言指定不同的提供商：
-
-```
-# 自动选择最佳提供商
-"生成一张赛博朋克城市图片"
-
-# 指定特定提供商
-"使用OpenAI生成一张卡通风格的猫咪图片"
-"请用混元创建一幅传统中国画"
-"用豆包生成一张奇幻风格的森林场景"
-
-# 使用提供商特定风格
-"创建一张hunyuan:shuimo风格的山水画"
-"生成一张doubao:chinese_painting风格的风景画"
-
-# 混合参数使用
-"使用OpenAI生成1792x1024分辨率的艺术肖像"
-"创建一张hunyuan:saibopengke风格的1024:768分辨率图片"
-```
-
-#### 验证
-
-1. 保存配置
-2. 重启 Cursor
-3. 新建对话，输入"生成一张山水风景图"
-4. 若配置无误，AI 会调用 MCP 服务生成图片并返回URL
-
-**注意**：首次使用时，Cursor 可能会请求你批准使用该 MCP server。
-
-让我们看看在 Cursor 中的具体步骤：
-
-1. 在 Cursor 中输入生成命令：
-
-   ![山景图](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mountain_cursor.png)
-
-2. 在你批准后，它会调用 MCP 图像生成工具并保存：
-
-   ![生成的山景图](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mountain_gtips.png)
-
-3. 查看或使用保存在指定目录（MCP_IMAGE_SAVE_DIR）中的图片：
-
-   ![生成的山景图](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mountain_curg.jpg)
-
-你也可以让 Cursor 为你的网站设计图片 ✨。Cursor 可以使用 MCP 工具根据特定布局要求生成匹配的图片 🎨。
-
-提示：你无需手动将生成的图片从保存目录移动到项目目录。Cursor 会在得到你的批准后自动处理这个过程。
-
-- 计划移动图片
-
-  ![计划移动](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/move_img_to_project.png)
-
-- 执行移动
-
-  ![执行移动](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/move_handle.png)
-
-- 效果展示
-
-  原始网页设计：
-  ![设计前](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/before_design.png)
-
-  使用 Cursor 生成并移动图片后的新设计：
-  ![设计后](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/after_design.png)
+运行中修改 `.env` 的模型/默认 provider 后，可调用 `reload_config` 热更新生效。
 
 
 ### 🧪 测试
@@ -565,9 +440,8 @@ python test_mcp_server.py --with-api
 
 - **未来计划**
   - 支持更多主流文生图模型 API，包括：
-    - 阿里通义万相
-    - 百度文心一格（ERNIE-ViLG）
-    - Stable Diffusion API
+    - Qwen-Image（Qwen/Wan 系列）
+    - 开源模型 API 服务（例如：FLUX、SDXL/SD3.5）
   - 高级功能：
     - 图像编辑和修改
     - 批量图像生成
@@ -594,30 +468,9 @@ python test_mcp_server.py --with-api
 
 ## 兼容性
 
-- **本地 IDE 集成（stdio）**: 已在 Cursor 和 Windsurf IDE 中验证可用
-- **远程访问（HTTP）**: 兼容任何支持 HTTP 传输的 MCP 客户端
-- **Claude 远程 MCP**: HTTP 传输支持通过公网 HTTP 端点连接 Claude
-
-  - Windsurf IDE 现已支持集成
-
-    - Windsurf 中调用 MCP 工具的截图
-
-    ![Windsurf 运行界面](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/windsurf_inte.png)
-
-    - 生成结果如下
-
-    ![Windsurf 调用结果](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/img_1746070231.jpg)
-
-## 致谢
-
-本项目以 [FastMCP](https://github.com/jlowin/fastmcp) 作为核心框架构建，这是一个强大的 Model Context Protocol 实现。MCP 集成基于：
-- [FastMCP](https://github.com/jlowin/fastmcp)：一个快速、Pythonic 的 MCP 服务器构建框架
-- [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)：Model Context Protocol 的官方 Python SDK
-
-我们同时使用了以下优秀的开源项目：
-- [UV](https://github.com/astral-sh/uv)：快速的 Python 包安装和解析工具
-- [Python-dotenv](https://github.com/theskumar/python-dotenv)：用于读取 .env 文件的键值对
-- [Tencentcloud-sdk-python](https://github.com/TencentCloud/tencentcloud-sdk-python)：腾讯云官方 Python SDK
+- **stdio**：已在 Cursor、Windsurf 中验证。
+- **HTTP（Streamable HTTP）**：适用于支持 HTTP 传输的 MCP 客户端。
+- 其他客户端/环境的兼容性取决于其 MCP 实现。
 
 ## 参与贡献
 
