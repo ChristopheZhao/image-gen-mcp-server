@@ -33,19 +33,22 @@ class _FakeProvider:
 
 
 class _FakeProviderManager:
-    def __init__(self):
-        self.default_provider = "fake"
+    def __init__(self, provider_name: str = "fake"):
+        self.default_provider = provider_name
+        self.provider_name = provider_name
         self._provider = _FakeProvider()
+        self.last_generate_kwargs = None
 
     def get_provider(self, provider_name: str):
-        if provider_name == "fake":
+        if provider_name == self.provider_name:
             return self._provider
         return None
 
     def get_available_providers(self):
-        return ["fake"]
+        return [self.provider_name]
 
     async def generate_images(self, query: str, provider_name: str, **kwargs):
+        self.last_generate_kwargs = kwargs
         image_data = base64.b64encode(b"fake-image-bytes").decode("ascii")
         return [
             {
@@ -98,6 +101,54 @@ class HTTPImageURLTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(result.get("ok"))
             image = result["images"][0]
             self.assertIsNone(image.get("url"))
+
+    async def test_generate_image_forwards_openai_options(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = ServerConfig(
+                transport="http",
+                host="127.0.0.1",
+                port=8123,
+                image_save_dir=tmpdir,
+            )
+            server = MCPImageServerHTTP(config)
+            fake_manager = _FakeProviderManager(provider_name="openai")
+            server.provider_manager = fake_manager
+
+            result = await server._generate_image(
+                prompt="test prompt",
+                provider="openai",
+                background="transparent",
+                output_format="webp",
+                output_compression=70,
+                moderation="low",
+            )
+
+            self.assertTrue(result.get("ok"))
+            self.assertIsNotNone(fake_manager.last_generate_kwargs)
+            self.assertEqual(fake_manager.last_generate_kwargs.get("background"), "transparent")
+            self.assertEqual(fake_manager.last_generate_kwargs.get("output_format"), "webp")
+            self.assertEqual(fake_manager.last_generate_kwargs.get("output_compression"), 70)
+            self.assertEqual(fake_manager.last_generate_kwargs.get("moderation"), "low")
+
+    async def test_generate_image_rejects_openai_options_for_other_providers(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = ServerConfig(
+                transport="http",
+                host="127.0.0.1",
+                port=8123,
+                image_save_dir=tmpdir,
+            )
+            server = MCPImageServerHTTP(config)
+            server.provider_manager = _FakeProviderManager(provider_name="doubao")
+
+            result = await server._generate_image(
+                prompt="test prompt",
+                provider="doubao",
+                background="auto",
+            )
+
+            self.assertFalse(result.get("ok"))
+            self.assertEqual(result["error"]["code"], "invalid_parameters")
 
     async def test_get_image_data_returns_base64_for_generated_image(self):
         with tempfile.TemporaryDirectory() as tmpdir:

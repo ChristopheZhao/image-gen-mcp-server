@@ -155,7 +155,7 @@ class MCPImageServerHTTP:
                         },
                         "style": {
                             "type": "string",
-                            "description": "Image style. Format: 'provider:style' or just 'style' for default provider",
+                            "description": "Provider style keyword (prompt-level style guidance). Format: 'provider:style' or just 'style' for default provider",
                             "default": ""
                         },
                         "resolution": {
@@ -171,6 +171,27 @@ class MCPImageServerHTTP:
                         "file_prefix": {
                             "type": "string",
                             "description": "Optional prefix for the output filename (English only)",
+                            "default": ""
+                        },
+                        "background": {
+                            "type": "string",
+                            "description": "OpenAI-only: image background mode (`transparent`, `opaque`, `auto`)",
+                            "default": ""
+                        },
+                        "output_format": {
+                            "type": "string",
+                            "description": "OpenAI-only: output image format (`png`, `jpeg`, `webp`)",
+                            "default": ""
+                        },
+                        "output_compression": {
+                            "type": ["integer", "null"],
+                            "description": "OpenAI-only: compression level 0-100 (requires `output_format` as `jpeg` or `webp`)",
+                            "minimum": 0,
+                            "maximum": 100
+                        },
+                        "moderation": {
+                            "type": "string",
+                            "description": "OpenAI-only: moderation level (`auto`, `low`)",
                             "default": ""
                         }
                     },
@@ -805,10 +826,18 @@ class MCPImageServerHTTP:
         style: str = "",
         resolution: str = "",
         negative_prompt: str = "",
-        file_prefix: str = ""
+        file_prefix: str = "",
+        background: str = "",
+        output_format: str = "",
+        output_compression: Optional[int] = None,
+        moderation: str = "",
     ) -> Dict[str, Any]:
         """Generate image using provider APIs."""
-        debug_print(f"generate_image called: prompt={prompt}, provider={provider}, style={style}, resolution={resolution}")
+        debug_print(
+            f"generate_image called: prompt={prompt}, provider={provider}, style={style}, "
+            f"resolution={resolution}, background={background}, output_format={output_format}, "
+            f"output_compression={output_compression}, moderation={moderation}"
+        )
 
         # Parse provider from style/resolution if not explicitly specified
         actual_provider = provider
@@ -893,6 +922,32 @@ class MCPImageServerHTTP:
             default_resolutions = provider_instance.get_available_resolutions()
             actual_resolution = list(default_resolutions.keys())[0] if default_resolutions else "1024x1024"
 
+        openai_options: Dict[str, Any] = {}
+        if isinstance(background, str):
+            background = background.strip()
+        if isinstance(output_format, str):
+            output_format = output_format.strip()
+        if isinstance(moderation, str):
+            moderation = moderation.strip()
+        if background:
+            openai_options["background"] = background
+        if output_format:
+            openai_options["output_format"] = output_format
+        if output_compression is not None and output_compression != "":
+            openai_options["output_compression"] = output_compression
+        if moderation:
+            openai_options["moderation"] = moderation
+
+        if openai_options and actual_provider != "openai":
+            return self._build_tool_error_result(
+                code="invalid_parameters",
+                message="OpenAI-specific parameters are only supported when provider=openai.",
+                details={
+                    "provider": actual_provider,
+                    "openai_parameters": sorted(openai_options.keys()),
+                }
+            )
+
         debug_print(f"Using provider: {actual_provider}, style: {actual_style}, resolution: {actual_resolution}")
 
         try:
@@ -914,7 +969,8 @@ class MCPImageServerHTTP:
                     provider_name=actual_provider,
                     style=actual_style,
                     resolution=actual_resolution,
-                    negative_prompt=negative_prompt
+                    negative_prompt=negative_prompt,
+                    **openai_options,
                 )
 
                 # Cancel progress task

@@ -51,6 +51,67 @@ class OpenAIProviderModelPolicyTests(unittest.TestCase):
         self.assertNotIn("style", kwargs)
         self.assertNotIn("response_format", kwargs)
 
+    def test_gpt_image_request_supports_openai_capability_options(self):
+        mock_client = MagicMock()
+        mock_client.images.generate = AsyncMock(
+            return_value=SimpleNamespace(
+                data=[SimpleNamespace(b64_json="ZmFrZV9pbWFnZQ==", revised_prompt=None)]
+            )
+        )
+
+        with patch("mcp_image_server.providers.openai_provider.openai.AsyncOpenAI", return_value=mock_client):
+            provider = OpenAIProvider(api_key="test-key", model="gpt-image-1.5")
+            result = asyncio.run(
+                provider.generate_images(
+                    query="a cat",
+                    style="natural",
+                    resolution="auto",
+                    negative_prompt="",
+                    background="transparent",
+                    output_format="webp",
+                    output_compression=70,
+                    moderation="low",
+                )
+            )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["provider"], "openai")
+        self.assertEqual(result[0]["content_type"], "image/webp")
+        kwargs = mock_client.images.generate.await_args.kwargs
+        self.assertEqual(kwargs["model"], "gpt-image-1.5")
+        self.assertEqual(kwargs["size"], "auto")
+        self.assertEqual(kwargs["background"], "transparent")
+        self.assertEqual(kwargs["output_format"], "webp")
+        self.assertEqual(kwargs["output_compression"], 70)
+        self.assertEqual(kwargs["moderation"], "low")
+
+    def test_gpt_image_rejects_invalid_background(self):
+        mock_client = MagicMock()
+        mock_client.images.generate = AsyncMock()
+
+        with patch("mcp_image_server.providers.openai_provider.openai.AsyncOpenAI", return_value=mock_client):
+            provider = OpenAIProvider(api_key="test-key", model="gpt-image-1.5")
+            result = asyncio.run(
+                provider.generate_images(
+                    query="a cat",
+                    style="natural",
+                    resolution="1024x1024",
+                    negative_prompt="",
+                    background="invalid",
+                )
+            )
+
+        self.assertEqual(len(result), 1)
+        self.assertIn("error", result[0])
+        self.assertIn("Invalid OpenAI background", result[0]["error"])
+        mock_client.images.generate.assert_not_awaited()
+
+    def test_openai_resolutions_include_auto(self):
+        with patch("mcp_image_server.providers.openai_provider.openai.AsyncOpenAI") as mock_async_openai:
+            mock_async_openai.return_value = MagicMock()
+            provider = OpenAIProvider(api_key="test-key", model="gpt-image-1.5")
+            self.assertIn("auto", provider.get_available_resolutions())
+
 
 if __name__ == "__main__":
     unittest.main()

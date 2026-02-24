@@ -236,7 +236,7 @@ You can connect from MCP-compatible client(recommand cursor now). The server pro
 - `resolutions://list` - List all available image resolutions
 
 #### Tools
-- `generate_image` - Generate images based on prompt, style, and resolution
+- `generate_image` - Generate images based on prompt, style, and resolution (OpenAI also supports `background`/`output_format`/`output_compression`/`moderation`)
 - `get_image_data` - Fetch base64 text for a previously generated image by `image_id`
 
 #### Prompts
@@ -291,12 +291,13 @@ generate_image(
 
 #### OpenAI GPT Image
 - **Styles**: 12 options including `natural`, `vivid`, `realistic`, `artistic`, `anime`
-- **Resolutions**: 3 options: `1024x1024`, `1536x1024`, `1024x1536`
+- **Resolutions**: 4 options: `1024x1024`, `1536x1024`, `1024x1536`, `auto`
+- **Advanced options**: `background`, `output_format`, `output_compression`, `moderation` (via MCP client)
 - **Specialty**: High-quality output, English optimization
 
 #### Doubao (ByteDance)
 - **Styles**: 12 options including `general`, `anime`, `chinese_painting`, `cyberpunk`
-- **Resolutions**: 9 options from `512x512` to `1024x576`
+- **Resolutions**: Model-dependent (auto-validated by configured model/fallback model)
 - **Specialty**: Balanced quality and speed
 
 ### Cursor Integration

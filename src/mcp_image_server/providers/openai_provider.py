@@ -1,14 +1,18 @@
 import openai
-import base64
-import json
 from typing import Dict, List, Optional
-import asyncio
-import aiohttp
 import sys
 from .base import BaseImageProvider, debug_print
 
 class OpenAIProvider(BaseImageProvider):
     """OpenAI image generation provider (GPT Image series)"""
+    _ALLOWED_BACKGROUNDS = {"transparent", "opaque", "auto"}
+    _ALLOWED_OUTPUT_FORMATS = {"png", "jpeg", "webp"}
+    _ALLOWED_MODERATION = {"low", "auto"}
+    _OUTPUT_MIME_BY_FORMAT = {
+        "png": "image/png",
+        "jpeg": "image/jpeg",
+        "webp": "image/webp",
+    }
 
     def __init__(self, api_key: str, model: str, base_url: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
@@ -49,7 +53,8 @@ class OpenAIProvider(BaseImageProvider):
         return {
             "1024x1024": "1024x1024 (1:1 正方形)",
             "1536x1024": "1536x1024 (3:2 横向)",
-            "1024x1536": "1024x1536 (2:3 竖向)"
+            "1024x1536": "1024x1536 (2:3 竖向)",
+            "auto": "auto (由模型自动选择最佳尺寸)",
         }
 
     async def generate_images(
@@ -73,15 +78,85 @@ class OpenAIProvider(BaseImageProvider):
             if negative_prompt:
                 styled_prompt = f"{styled_prompt}. Avoid: {negative_prompt}"
 
+            background = kwargs.get("background")
+            output_format = kwargs.get("output_format")
+            output_compression = kwargs.get("output_compression")
+            moderation = kwargs.get("moderation")
+
+            if isinstance(background, str):
+                background = background.strip().lower()
+            if isinstance(output_format, str):
+                output_format = output_format.strip().lower()
+            if isinstance(moderation, str):
+                moderation = moderation.strip().lower()
+
+            if background and background not in self._ALLOWED_BACKGROUNDS:
+                return [{
+                    "error": (
+                        f"Invalid OpenAI background '{background}'. "
+                        f"Allowed values: {sorted(self._ALLOWED_BACKGROUNDS)}"
+                    ),
+                    "content_type": "text/plain",
+                }]
+
+            if output_format and output_format not in self._ALLOWED_OUTPUT_FORMATS:
+                return [{
+                    "error": (
+                        f"Invalid OpenAI output_format '{output_format}'. "
+                        f"Allowed values: {sorted(self._ALLOWED_OUTPUT_FORMATS)}"
+                    ),
+                    "content_type": "text/plain",
+                }]
+
+            if moderation and moderation not in self._ALLOWED_MODERATION:
+                return [{
+                    "error": (
+                        f"Invalid OpenAI moderation '{moderation}'. "
+                        f"Allowed values: {sorted(self._ALLOWED_MODERATION)}"
+                    ),
+                    "content_type": "text/plain",
+                }]
+
+            if output_compression is not None and output_compression != "":
+                try:
+                    output_compression = int(output_compression)
+                except (TypeError, ValueError):
+                    return [{
+                        "error": "Invalid OpenAI output_compression. Expected integer between 0 and 100.",
+                        "content_type": "text/plain",
+                    }]
+                if output_compression < 0 or output_compression > 100:
+                    return [{
+                        "error": "Invalid OpenAI output_compression. Expected integer between 0 and 100.",
+                        "content_type": "text/plain",
+                    }]
+                if output_format not in {"jpeg", "webp"}:
+                    return [{
+                        "error": "OpenAI output_compression requires output_format to be 'jpeg' or 'webp'.",
+                        "content_type": "text/plain",
+                    }]
+
             debug_print(f"[DEBUG] Calling OpenAI API with model={self.model}, prompt: {styled_prompt}")
 
             # GPT Image models: no legacy DALL-E style/response_format parameters.
+            request_kwargs = {
+                "model": self.model,
+                "prompt": styled_prompt,
+                "size": resolution,
+                "quality": "auto",
+                "n": 1,
+            }
+            if background:
+                request_kwargs["background"] = background
+            if output_format:
+                request_kwargs["output_format"] = output_format
+            if output_compression is not None and output_compression != "":
+                request_kwargs["output_compression"] = output_compression
+            if moderation:
+                request_kwargs["moderation"] = moderation
+
             response = await self.client.images.generate(
-                model=self.model,
-                prompt=styled_prompt,
-                size=resolution,
-                quality="auto",
-                n=1
+                **request_kwargs
             )
 
             debug_print(f"[DEBUG] OpenAI API call successful")
@@ -103,10 +178,11 @@ class OpenAIProvider(BaseImageProvider):
                 }]
 
             debug_print(f"[DEBUG] Image successfully generated, base64 length: {len(image_data.b64_json)}")
+            image_mime_type = self._OUTPUT_MIME_BY_FORMAT.get(output_format, "image/png")
 
             result = [{
                 "content": image_data.b64_json,
-                "content_type": "image/png",
+                "content_type": image_mime_type,
                 "description": query,
                 "style": style,
                 "provider": self.get_provider_name(),

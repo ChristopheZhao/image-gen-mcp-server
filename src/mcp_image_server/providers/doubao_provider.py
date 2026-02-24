@@ -9,6 +9,29 @@ from .base import BaseImageProvider, debug_print
 class DoubaoProvider(BaseImageProvider):
     """ByteDance Doubao (豆包) image generation provider using Ark API"""
 
+    _BASE_RESOLUTIONS: Dict[str, str] = {
+        # High-res options first so default routing does not fall back to legacy low resolutions.
+        "2048x2048": "2048x2048 (2K 正方形，推荐)",
+        "2560x1440": "2560x1440 (2K 16:9 横向)",
+        "1440x2560": "1440x2560 (2K 9:16 竖向)",
+        "2304x1728": "2304x1728 (2K 4:3 横向)",
+        "1728x2304": "1728x2304 (2K 3:4 竖向)",
+        "2496x1664": "2496x1664 (2K 3:2 横向)",
+        "1664x2496": "1664x2496 (2K 2:3 竖向)",
+        "3024x1296": "3024x1296 (2K 21:9 横向)",
+        "1296x3024": "1296x3024 (2K 9:21 竖向)",
+        # Legacy lower-res options (kept for older models, filtered for 4.x as needed).
+        "1024x1024": "1024x1024 (1:1 大正方形)",
+        "768x1024": "768x1024 (3:4 竖向)",
+        "1024x768": "1024x768 (4:3 横向)",
+        "576x1024": "576x1024 (9:16 竖向)",
+        "1024x576": "1024x576 (16:9 横向)",
+        "768x768": "768x768 (1:1 正方形)",
+        "512x768": "512x768 (2:3 竖向)",
+        "768x512": "768x512 (3:2 横向)",
+        "512x512": "512x512 (1:1 小正方形)",
+    }
+
     def __init__(
         self,
         api_key: str,
@@ -29,6 +52,31 @@ class DoubaoProvider(BaseImageProvider):
 
     def get_provider_name(self) -> str:
         return "doubao"
+
+    @staticmethod
+    def _pixels_for_resolution(resolution: str) -> int:
+        try:
+            width_text, height_text = resolution.lower().split("x", 1)
+            return int(width_text) * int(height_text)
+        except Exception:
+            return 0
+
+    @staticmethod
+    def _minimum_pixels_for_model(model_name: str) -> int:
+        model = (model_name or "").strip().lower()
+        if not model:
+            return 0
+        if "seedream-4.5" in model or "seedream-4-5" in model:
+            return 2560 * 1440
+        if "seedream-4.0" in model or "seedream-4-0" in model or "seedream-4" in model:
+            return 1280 * 720
+        return 0
+
+    def _minimum_pixels_required(self) -> int:
+        required = self._minimum_pixels_for_model(self.model)
+        if self.fallback_model:
+            required = max(required, self._minimum_pixels_for_model(self.fallback_model))
+        return required
 
     def get_available_styles(self) -> Dict[str, str]:
         """
@@ -55,17 +103,18 @@ class DoubaoProvider(BaseImageProvider):
         Doubao Seedream models supported resolutions.
         Format: WIDTHxHEIGHT
         """
-        return {
-            "512x512": "512x512 (1:1 小正方形)",
-            "768x768": "768x768 (1:1 正方形)",
-            "1024x1024": "1024x1024 (1:1 大正方形)",
-            "512x768": "512x768 (2:3 竖向)",
-            "768x512": "768x512 (3:2 横向)",
-            "576x1024": "576x1024 (9:16 竖向)",
-            "1024x576": "1024x576 (16:9 横向)",
-            "768x1024": "768x1024 (3:4 竖向)",
-            "1024x768": "1024x768 (4:3 横向)"
+        minimum_pixels = self._minimum_pixels_required()
+        if minimum_pixels <= 0:
+            return dict(self._BASE_RESOLUTIONS)
+
+        filtered = {
+            resolution: desc
+            for resolution, desc in self._BASE_RESOLUTIONS.items()
+            if self._pixels_for_resolution(resolution) >= minimum_pixels
         }
+
+        # Defensive fallback: keep at least one valid high-resolution option.
+        return filtered or {"2048x2048": self._BASE_RESOLUTIONS["2048x2048"]}
 
     @staticmethod
     def _is_model_unavailable_error(error_text: str) -> bool:
