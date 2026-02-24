@@ -290,10 +290,14 @@ def image_extension_from_mime(mime_type: str) -> str:
 async def generate_image(
     prompt: Annotated[str, Field(description="Image description text")],
     provider: Annotated[str, Field(description="API provider to use. Available: hunyuan, openai, doubao. Leave empty to use default provider")] = "",
-    style: Annotated[str, Field(description="Image style. Format: 'provider:style' or just 'style' for default provider")] = "",
+    style: Annotated[str, Field(description="Provider style keyword (prompt-level style guidance). Format: 'provider:style' or just 'style' for default provider")] = "",
     resolution: Annotated[str, Field(description="Image resolution. Format: 'provider:resolution' or just 'resolution' for default provider")] = "",
     negative_prompt: Annotated[str, Field(description="Negative prompt, describes content you don't want in the image")] = "",
-    file_prefix: Annotated[str, Field(description="Optional prefix for the output filename (English only)")] = ""
+    file_prefix: Annotated[str, Field(description="Optional prefix for the output filename (English only)")] = "",
+    background: Annotated[str, Field(description="OpenAI-only: image background mode (`transparent`, `opaque`, `auto`)")] = "",
+    output_format: Annotated[str, Field(description="OpenAI-only: output image format (`png`, `jpeg`, `webp`)")] = "",
+    output_compression: Annotated[Optional[int], Field(description="OpenAI-only: compression level 0-100 (requires `output_format` as `jpeg` or `webp`)")] = None,
+    moderation: Annotated[str, Field(description="OpenAI-only: moderation level (`auto`, `low`)")] = "",
 ):
     """
     Generate image based on prompt using multiple API providers
@@ -305,8 +309,16 @@ async def generate_image(
         resolution: Image resolution (can be provider:resolution format or just resolution for default provider)
         negative_prompt: Negative prompt, describes content you don't want in the image
         file_prefix: Optional prefix for the output filename (English only)
+        background: OpenAI-only background mode
+        output_format: OpenAI-only output format
+        output_compression: OpenAI-only compression level
+        moderation: OpenAI-only moderation level
     """
-    debug_print(f"generate_image called: prompt={prompt}, provider={provider}, style={style}, resolution={resolution}, negative_prompt={negative_prompt}, file_prefix={file_prefix}")
+    debug_print(
+        f"generate_image called: prompt={prompt}, provider={provider}, style={style}, resolution={resolution}, "
+        f"negative_prompt={negative_prompt}, file_prefix={file_prefix}, background={background}, "
+        f"output_format={output_format}, output_compression={output_compression}, moderation={moderation}"
+    )
 
     # Parse provider from style/resolution if not explicitly specified
     actual_provider = provider
@@ -399,6 +411,34 @@ async def generate_image(
         default_resolutions = provider_instance.get_available_resolutions()
         actual_resolution = list(default_resolutions.keys())[0] if default_resolutions else "1024x1024"
 
+    openai_options: Dict[str, Any] = {}
+    if isinstance(background, str):
+        background = background.strip()
+    if isinstance(output_format, str):
+        output_format = output_format.strip()
+    if isinstance(moderation, str):
+        moderation = moderation.strip()
+    if background:
+        openai_options["background"] = background
+    if output_format:
+        openai_options["output_format"] = output_format
+    if output_compression is not None and output_compression != "":
+        openai_options["output_compression"] = output_compression
+    if moderation:
+        openai_options["moderation"] = moderation
+
+    if openai_options and actual_provider != "openai":
+        return tool_result_to_content(
+            build_tool_error_result(
+                code="invalid_parameters",
+                message="OpenAI-specific parameters are only supported when provider=openai.",
+                details={
+                    "provider": actual_provider,
+                    "openai_parameters": sorted(openai_options.keys())
+                }
+            )
+        )
+
     debug_print(f"Using provider: {actual_provider}, style: {actual_style}, resolution: {actual_resolution}")
 
     try:
@@ -418,7 +458,8 @@ async def generate_image(
                 provider_name=actual_provider,
                 style=actual_style,
                 resolution=actual_resolution,
-                negative_prompt=negative_prompt
+                negative_prompt=negative_prompt,
+                **openai_options
             )
 
             progress_task.cancel()

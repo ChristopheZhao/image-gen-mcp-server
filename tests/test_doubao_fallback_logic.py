@@ -36,6 +36,29 @@ class DoubaoFallbackLogicTests(unittest.TestCase):
         )
         self.assertIsNone(provider.fallback_model)
 
+    def test_filters_low_resolutions_for_seedream_4_models(self):
+        provider = DoubaoProvider(
+            api_key="test-key",
+            model="doubao-seedream-4-0-250828",
+        )
+        resolutions = provider.get_available_resolutions()
+
+        self.assertNotIn("512x512", resolutions)
+        self.assertNotIn("768x768", resolutions)
+        self.assertIn("1024x1024", resolutions)
+
+    def test_uses_stricter_resolution_limit_when_fallback_is_seedream_45(self):
+        provider = DoubaoProvider(
+            api_key="test-key",
+            model="doubao-seedream-4-0-250828",
+            fallback_model="doubao-seedream-4-5-251128",
+        )
+        resolutions = provider.get_available_resolutions()
+
+        self.assertNotIn("1024x1024", resolutions)
+        self.assertIn("2560x1440", resolutions)
+        self.assertIn("2048x2048", resolutions)
+
 
 if __name__ == "__main__":
     unittest.main()

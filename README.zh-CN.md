@@ -235,7 +235,7 @@ MCP 服务器成功运行截图：
 - `resolutions://list` - 获取所有可用分辨率
 
 #### 工具
-- `generate_image` - 根据提示词、风格、分辨率生成图片
+- `generate_image` - 根据提示词、风格、分辨率生成图片（OpenAI 额外支持 `background`/`output_format`/`output_compression`/`moderation`）
 - `get_image_data` - 按 `image_id` 获取已生成图片的 base64 文本
 
 #### 提示模板
@@ -290,12 +290,13 @@ generate_image(
 
 #### OpenAI GPT Image
 - **风格**: 12种选项，包括 `natural`、`vivid`、`realistic`、`artistic`、`anime`
-- **分辨率**: 3种选项：`1024x1024`、`1536x1024`、`1024x1536`
+- **分辨率**: 4种选项：`1024x1024`、`1536x1024`、`1024x1536`、`auto`
+- **高级参数**: `background`、`output_format`、`output_compression`、`moderation`（通过 MCP client 传入）
 - **特色**: 高质量输出，英文优化
 
 #### 豆包（字节跳动）
 - **风格**: 12种选项，包括 `general`、`anime`、`chinese_painting`、`cyberpunk`
-- **分辨率**: 9种选项，从 `512x512` 到 `1024x576`
+- **分辨率**: 与模型版本相关（会根据主/回退模型自动校验）
 - **特色**: 平衡的质量和速度
 
 ### Cursor 集成
