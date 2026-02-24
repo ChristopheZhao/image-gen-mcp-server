@@ -278,7 +278,7 @@ generate_image(
     prompt="Artistic portrait of a musician",
     provider="openai",
     style="artistic",
-    resolution="1792x1024"
+    resolution="1536x1024"
 )
 ```
 
@@ -301,126 +301,20 @@ generate_image(
 
 ### Cursor Integration
 
-To add this MCP server in Cursor:
+For integration setup details and sample config JSON, see:
+- [docs/VSCODE_INTEGRATION.md](docs/VSCODE_INTEGRATION.md)
 
-1. Open Cursor
-2. Go to Settings > Features > MCP
-3. Click "+ Add New MCP Server"
-4. Fill in the configuration:
-   - **Name**: `Multi-API Image Generator` (or any descriptive name)
-   - **Type**: `stdio`
-   - **Command**: Full command, must include the absolute path to Python and the script
+Recommended minimum environment variables:
+- `MCP_IMAGE_SAVE_DIR`
+- Provider credentials you actually use:
+`TENCENT_SECRET_ID` + `TENCENT_SECRET_KEY`, `OPENAI_API_KEY`, `DOUBAO_API_KEY`
 
-#### Single API Configuration (Original)
-```json
-{
-  "mcpServers": {
-    "image-generation": {
-      "name": "Multi-API Image Generation Service",
-      "description": "Multi-provider image generation using Hunyuan, OpenAI, and Doubao APIs",
-      "type": "stdio",
-      "command": "D:\\your_path\\image-gen-mcp-server\\.venv\\Scripts\\python.exe",
-      "args": ["-m", "mcp_image_server"],
-      "environment": ["TENCENT_SECRET_ID", "TENCENT_SECRET_KEY", "OPENAI_API_KEY", "DOUBAO_API_KEY", "MCP_DEFAULT_PROVIDER", "MCP_IMAGE_SAVE_DIR"],
-      "autoRestart": true,
-      "startupTimeoutMs": 30000
-    }
-  }
-}
-```
+Optional provider/model controls:
+- `OPENAI_BASE_URL`, `OPENAI_MODEL`
+- `DOUBAO_ENDPOINT`, `DOUBAO_MODEL`, `DOUBAO_FALLBACK_MODEL`
+- `MCP_DEFAULT_PROVIDER` (recommended when multiple providers are enabled)
 
->  📝 **Note:** For detailed VS Code integration guide, see [docs/VSCODE_INTEGRATION.md](docs/VSCODE_INTEGRATION.md)
-
-#### Environment Variables
-
-When configuring the MCP server in Cursor, set the following environment variables:
-
-**For Single API (Hunyuan only)**:
-- `TENCENT_SECRET_ID`: Your Tencent Cloud API Secret ID
-- `TENCENT_SECRET_KEY`: Your Tencent Cloud API Secret Key
-- `MCP_IMAGE_SAVE_DIR`: Your save image dir, e.g.: D:\data\mcp_img
-
-**For Multi-API (All providers)**:
-- `TENCENT_SECRET_ID`: Your Tencent Cloud API Secret ID
-- `TENCENT_SECRET_KEY`: Your Tencent Cloud API Secret Key
-- `OPENAI_API_KEY`: Your OpenAI API Key
-- `DOUBAO_API_KEY`: Your Doubao API Key (Ark)
-- `MCP_IMAGE_SAVE_DIR`: Your save image dir, e.g.: D:\data\mcp_img
-- `OPENAI_BASE_URL`: (Optional) Custom OpenAI endpoint
-- `OPENAI_MODEL`: (Optional) OpenAI image model, default: `gpt-image-1.5`
-- `DOUBAO_ENDPOINT`: (Optional) Custom Doubao endpoint
-- `DOUBAO_MODEL`: (Optional) Doubao primary model, default: `doubao-seedream-4.5`
-- `DOUBAO_FALLBACK_MODEL`: (Optional) Doubao fallback model, default: `doubao-seedream-4.0`
-- `MCP_DEFAULT_PROVIDER`: (Optional but recommended when multiple providers are enabled) default provider to use when request does not specify one. Allowed: `hunyuan`, `openai`, `doubao`
-
-**Note**: You only need to configure providers you want to use. When multiple providers are configured, set `MCP_DEFAULT_PROVIDER` to avoid implicit routing order. After changing `.env` model/default-provider settings at runtime, call `reload_config` to apply without restart (or restart server if you changed non hot-reloadable fields like `MCP_PORT`).
-
-### 🎯 Multi-API Usage in Cursor
-
-With the multi-API server, you can use natural language in Cursor to specify different providers:
-
-```
-# Auto-select the best provider
-"Generate a cyberpunk city image"
-
-# Specify a particular provider
-"Use OpenAI to generate a cartoon-style cat image"
-"Please use Hunyuan to create a traditional Chinese painting"
-"Generate with Doubao a fantasy-style forest scene"
-
-# Use provider-specific styles
-"Create an image with hunyuan:shuimo style showing mountains and rivers"
-"Generate a doubao:chinese_painting style landscape"
-
-# Mix parameters
-"Use OpenAI to generate a 1792x1024 artistic portrait"
-"Create a hunyuan:saibopengke style image at 1024:768 resolution"
-```
-
-#### Verification
-
-1. Save the configuration
-2. Restart Cursor
-3. Start a new chat and enter: "Generate a mountain landscape image"
-4. If everything is set up correctly, the AI will use your MCP server to generate the image
-
-**Note:** The first time you use it, Cursor may ask for permission to use this MCP server.
-
-Let's look at the steps in Cursor:
-
-- step_1: types your generate command in cursor
-
-  ![Mountain Landscape](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mountain_cursor.png)
-
-- step_2: after your approval it will call the mcp image-gen tool and save it
-
-  ![Mountain Landscape](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mountain_gtips.png)
-
-
-- Step 3: View or use the image saved in the directory (MCP_IMAGE_SAVE_DIR) you have set in the .env file
-
-  ![Generated Mountain Image](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/mountain_curg.jpg)
-
-
-You can also ask Cursor to design images for your website ✨. Cursor can use the MCP tool to generate images that match your specific layout requirements 🎨. Perfect for creating beautiful web designs! 
-
-Tip: You don't need to manually move the generated images from the save directory to your project directory. Cursor will handle this automatically after your approval. This is one of the main advantages of using Cursor.
-
-- Planning the move 
-
-  ![plan move](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/move_img_to_project.png)
-
-- Executing the move
-
-  ![act move](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/move_handle.png)
-
-- Example Performance
-
-  Original web design:
-  ![Before Design](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/before_design.png)
-
-  New design after generating and moving the image to the project using Cursor:
-  ![After Design](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/after_design.png)
+After changing `.env` model/default-provider values at runtime, call `reload_config`.
 
 
 ### 🧪 Testing
@@ -556,9 +450,8 @@ For detailed API documentation and pricing, please refer to:
 
 - **Future Plans**
   - Support more mainstream text-to-image model APIs, including:
-    - Alibaba Tongyi Wanxiang
-    - Baidu ERNIE-ViLG
-    - Stable Diffusion API
+    - Qwen-Image (Qwen/Wan family)
+    - Open-source model API services (for example: FLUX, SDXL/SD3.5)
   - Advanced features:
     - Image editing and modification
     - Batch image generation
@@ -573,32 +466,9 @@ For detailed API documentation and pricing, please refer to:
 
 ## Compatibility
 
-- **Local IDE Integration (stdio)**: Verified to work with Cursor and Windsurf IDE
-- **Remote Access (HTTP)**: Compatible with any MCP client supporting HTTP transport
-- **Claude Remote MCP**: HTTP transport enables connection to Claude with public HTTP endpoint
-
-  - windsurf is also supported to integrated now
-
-    - screenshot of mcp tool call in windsurf
-
-    - ![windsurf run interface](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/windsurf_inte.png)
-
-    - and the result as follows
-
-    - ![windsurf call result](https://wechat-img-1317551199.cos.ap-shanghai.myqcloud.com/github/img_1746070231.jpg)
-
-- Future plans include supporting more IDEs and development environments compatible with the Model Context Protocol (MCP).
-
-## Acknowledgments
-
-This project is built with [FastMCP](https://github.com/jlowin/fastmcp) as the core framework, a powerful implementation of the Model Context Protocol. The MCP integration is based on:
-- [FastMCP](https://github.com/jlowin/fastmcp): A fast, Pythonic way to build MCP servers
-- [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk): The official Python SDK for Model Context Protocol
-
-We also use these excellent open-source projects:
-- [UV](https://github.com/astral-sh/uv): A fast Python package installer and resolver
-- [Python-dotenv](https://github.com/theskumar/python-dotenv): Reads key-value pairs from .env file
-- [Tencentcloud-sdk-python](https://github.com/TencentCloud/tencentcloud-sdk-python): Official Tencent Cloud SDK for Python
+- **stdio**: Verified with Cursor and Windsurf.
+- **HTTP (Streamable HTTP)**: Works with MCP clients that support HTTP transport.
+- For other clients/environments, compatibility depends on the client-side MCP implementation.
 
 ## Contributing
 
