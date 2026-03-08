@@ -1089,12 +1089,19 @@ You can specify provider:style or provider:resolution format, or let the system 
             },
         }
 
+    def _is_notification(self, message: Dict[str, Any]) -> bool:
+        """Check if a JSON-RPC message is a notification (no 'id' field)."""
+        return "id" not in message
+
     async def _handle_json_rpc(self, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         method = message.get("method")
         params = message.get("params", {})
         request_id = message.get("id")
 
-        if method == "notifications/initialized":
+        # JSON-RPC notifications must not receive a response
+        if self._is_notification(message):
+            if method and method.startswith("notifications/"):
+                debug_print(f"[JSON-RPC] Received notification: {method}")
             return None
 
         try:
@@ -1171,23 +1178,30 @@ You can specify provider:style or provider:resolution format, or let the system 
         debug_print("Provider manager: lazy initialization")
         debug_print("=" * 50)
 
-        for line in sys.stdin:
-            line = line.strip()
-            if not line:
-                continue
+        # Use a single event loop for the server lifetime to allow async resource
+        # reuse (e.g., HTTP connection pools in providers)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            for line in sys.stdin:
+                line = line.strip()
+                if not line:
+                    continue
 
-            try:
-                message = json.loads(line)
-            except json.JSONDecodeError as exc:
-                debug_print(f"[STDIO] Invalid JSON-RPC line: {exc}")
-                continue
+                try:
+                    message = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    debug_print(f"[STDIO] Invalid JSON-RPC line: {exc}")
+                    continue
 
-            response = asyncio.run(self._handle_json_rpc(message))
-            if response is None:
-                continue
+                response = loop.run_until_complete(self._handle_json_rpc(message))
+                if response is None:
+                    continue
 
-            sys.stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
-            sys.stdout.flush()
+                sys.stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
+                sys.stdout.flush()
+        finally:
+            loop.close()
 
         debug_print("Server stopped")
 
