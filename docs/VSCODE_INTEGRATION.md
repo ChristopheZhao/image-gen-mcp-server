@@ -29,10 +29,7 @@ mkdir -p .vscode
 {
   "servers": {
     "image-gen-stdio": {
-      "command": "/mnt/d/code/OpenSource/tools/image-gen-mcp-server/.venv/bin/python",
-      "args": [
-        "/mnt/d/code/OpenSource/tools/image-gen-mcp-server/mcp_image_server_unified.py"
-      ],
+      "command": "/mnt/d/code/OpenSource/tools/image-gen-mcp-server/.venv/bin/mcp-image-server",
       "env": {
         "MCP_TRANSPORT": "stdio"
       }
@@ -51,10 +48,7 @@ mkdir -p .vscode
 {
   "servers": {
     "image-gen-stdio": {
-      "command": "D:\\code\\OpenSource\\tools\\image-gen-mcp-server\\.venv\\Scripts\\python.exe",
-      "args": [
-        "D:\\code\\OpenSource\\tools\\image-gen-mcp-server\\mcp_image_server_unified.py"
-      ],
+      "command": "D:\\code\\OpenSource\\tools\\image-gen-mcp-server\\.venv\\Scripts\\mcp-image-server.exe",
       "env": {
         "MCP_TRANSPORT": "stdio"
       }
@@ -76,10 +70,7 @@ mkdir -p .vscode
   // ... 其他配置 ...
   "chat.mcp.servers": {
     "image-gen-stdio": {
-      "command": "/mnt/d/code/OpenSource/tools/image-gen-mcp-server/.venv/bin/python",
-      "args": [
-        "/mnt/d/code/OpenSource/tools/image-gen-mcp-server/mcp_image_server_unified.py"
-      ],
+      "command": "/mnt/d/code/OpenSource/tools/image-gen-mcp-server/.venv/bin/mcp-image-server",
       "env": {
         "MCP_TRANSPORT": "stdio"
       }
@@ -161,16 +152,14 @@ code .vscode/mcp.json
 手动测试服务器：
 ```bash
 cd /mnt/d/code/OpenSource/tools/image-gen-mcp-server
-MCP_TRANSPORT=stdio .venv/bin/python mcp_image_server_unified.py
+MCP_TRANSPORT=stdio .venv/bin/mcp-image-server
 ```
 
 应该看到：
 ```
 Starting MCP Image Generation Server...
 Transport mode: stdio
-Using stdio transport (FastMCP)
-[INFO] Hunyuan provider initialized successfully
-Available providers: ['hunyuan']
+Using stdio transport (native)
 ```
 
 **问题：相对路径 vs 绝对路径**
@@ -180,8 +169,7 @@ Available providers: ['hunyuan']
 {
   "servers": {
     "image-gen-stdio": {
-      "command": ".venv/bin/python",
-      "args": ["mcp_image_server_unified.py"],
+      "command": ".venv/bin/mcp-image-server",
       "env": {
         "MCP_TRANSPORT": "stdio"
       }
@@ -218,8 +206,7 @@ Cline 使用不同的配置格式：
 {
   "mcpServers": {
     "image-gen-stdio": {
-      "command": "/path/to/.venv/bin/python",
-      "args": ["/path/to/mcp_image_server_unified.py"],
+      "command": "/path/to/.venv/bin/mcp-image-server",
       "env": {
         "MCP_TRANSPORT": "stdio"
       }
@@ -253,8 +240,7 @@ Cline 使用不同的配置格式：
   "models": [...],
   "mcpServers": {
     "image-gen-stdio": {
-      "command": "/path/to/.venv/bin/python",
-      "args": ["/path/to/mcp_image_server_unified.py"],
+      "command": "/path/to/.venv/bin/mcp-image-server",
       "env": {
         "MCP_TRANSPORT": "stdio"
       }
@@ -279,10 +265,7 @@ cat > .vscode/mcp.json << EOF
 {
   "servers": {
     "image-gen-stdio": {
-      "command": "$(pwd)/.venv/bin/python",
-      "args": [
-        "$(pwd)/mcp_image_server_unified.py"
-      ],
+      "command": "$(pwd)/.venv/bin/mcp-image-server",
       "env": {
         "MCP_TRANSPORT": "stdio"
       }
@@ -302,10 +285,7 @@ cat > vscode_settings_snippet.json << EOF
 {
   "chat.mcp.servers": {
     "image-gen-stdio": {
-      "command": "$(pwd)/.venv/bin/python",
-      "args": [
-        "$(pwd)/mcp_image_server_unified.py"
-      ],
+      "command": "$(pwd)/.venv/bin/mcp-image-server",
       "env": {
         "MCP_TRANSPORT": "stdio"
       }

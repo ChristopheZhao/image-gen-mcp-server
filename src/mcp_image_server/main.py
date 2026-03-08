@@ -24,10 +24,9 @@ def main():
         print(f"Transport mode: {config.transport}", file=sys.stderr)
 
         if config.is_stdio_transport():
-            # Use existing FastMCP stdio implementation for backward compatibility
-            print("Using stdio transport (FastMCP)", file=sys.stderr)
-            from .transports.stdio import main as stdio_main
-            stdio_main()
+            print("Using stdio transport (native)", file=sys.stderr)
+            from .transports.stdio_server import run_stdio_server
+            run_stdio_server(config)
 
         elif config.is_http_transport():
             # Use new HTTP implementation

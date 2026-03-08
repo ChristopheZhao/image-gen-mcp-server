@@ -163,12 +163,6 @@ The unified server will automatically use the transport mode specified in your `
 - `MCP_TRANSPORT=stdio` → Local stdio mode for IDE integration
 - `MCP_TRANSPORT=http` → HTTP server mode for remote access
 
-#### Legacy Examples
-```bash
-# Legacy examples moved to examples/ directory
-python examples/legacy_single_api_server.py
-```
-
 ### 📡 HTTP Transport Mode
 
 For remote access and enterprise deployment, use HTTP transport:
