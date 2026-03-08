@@ -6,7 +6,4 @@ Supports:
 - HTTP: HTTP transport for remote access with session management
 """
 
-from .stdio import *
-from .http_server import *
-
-__all__ = ["stdio", "http_server", "http", "auth", "session_manager"]
+__all__ = ["stdio_server", "http_server", "http", "auth", "session_manager"]

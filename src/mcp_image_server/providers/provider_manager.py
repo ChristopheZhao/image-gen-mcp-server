@@ -1,9 +1,35 @@
 from typing import Dict, Optional, List
 from .base import BaseImageProvider, debug_print
-from .hunyuan_provider import HunyuanProvider
-from .openai_provider import OpenAIProvider
-from .doubao_provider import DoubaoProvider
 from ..config import ServerConfig
+
+HunyuanProvider = None
+OpenAIProvider = None
+DoubaoProvider = None
+
+
+def _resolve_hunyuan_provider():
+    global HunyuanProvider
+    if HunyuanProvider is None:
+        from .hunyuan_provider import HunyuanProvider as _HunyuanProvider
+        HunyuanProvider = _HunyuanProvider
+    return HunyuanProvider
+
+
+def _resolve_openai_provider():
+    global OpenAIProvider
+    if OpenAIProvider is None:
+        from .openai_provider import OpenAIProvider as _OpenAIProvider
+        OpenAIProvider = _OpenAIProvider
+    return OpenAIProvider
+
+
+def _resolve_doubao_provider():
+    global DoubaoProvider
+    if DoubaoProvider is None:
+        from .doubao_provider import DoubaoProvider as _DoubaoProvider
+        DoubaoProvider = _DoubaoProvider
+    return DoubaoProvider
+
 
 class ProviderManager:
     """Manages multiple image generation API providers"""
@@ -22,7 +48,8 @@ class ProviderManager:
         # Initialize Hunyuan provider
         if self.config.tencent_secret_id and self.config.tencent_secret_key:
             try:
-                self.providers["hunyuan"] = HunyuanProvider(
+                provider_cls = _resolve_hunyuan_provider()
+                self.providers["hunyuan"] = provider_cls(
                     secret_id=self.config.tencent_secret_id,
                     secret_key=self.config.tencent_secret_key
                 )
@@ -40,7 +67,8 @@ class ProviderManager:
                 debug_print("[WARNING] OPENAI_MODEL is empty. Skipping OpenAI provider initialization.")
             else:
                 try:
-                    self.providers["openai"] = OpenAIProvider(
+                    provider_cls = _resolve_openai_provider()
+                    self.providers["openai"] = provider_cls(
                         api_key=self.config.openai_api_key,
                         base_url=self.config.openai_base_url,
                         model=openai_model
@@ -60,7 +88,8 @@ class ProviderManager:
                 debug_print("[WARNING] DOUBAO_MODEL is empty. Skipping Doubao provider initialization.")
             else:
                 try:
-                    self.providers["doubao"] = DoubaoProvider(
+                    provider_cls = _resolve_doubao_provider()
+                    self.providers["doubao"] = provider_cls(
                         api_key=self.config.doubao_api_key,
                         endpoint=self.config.doubao_endpoint,
                         model=doubao_model,
