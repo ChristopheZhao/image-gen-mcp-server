@@ -233,6 +233,10 @@ class MCPHTTPHandler:
                 response_headers[self.SESSION_HEADER] = session.session_id
                 self._debug_print(f"[POST] New session created: {session.session_id}")
 
+            # Notifications have no response body (JSON-RPC 2.0 / MCP Streamable HTTP)
+            if result is None:
+                return Response(status_code=202, headers=response_headers)
+
             # Return success response
             return JSONResponse(
                 result,

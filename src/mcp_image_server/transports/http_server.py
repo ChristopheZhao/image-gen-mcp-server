@@ -1251,13 +1251,19 @@ You can specify provider:style or provider:resolution format, or let the system 
 
         debug_print(f"[JSON-RPC] Method: {method}, ID: {request_id}")
 
+        # JSON-RPC notifications (no "id", e.g. notifications/initialized) must not
+        # receive a response. Returning None lets the transport answer 202 Accepted.
+        if request_id is None and isinstance(method, str) and method.startswith("notifications/"):
+            debug_print(f"[JSON-RPC] Notification accepted: {method}")
+            return None
+
         try:
             # Route to appropriate handler
             if method == "initialize":
                 result = await self._handle_initialize(params)
             elif method == "tools/list":
                 tools = await self._list_tools()
-                result = {"tools": [tool.model_dump(mode='json') for tool in tools]}
+                result = {"tools": [tool.model_dump(mode="json", by_alias=True, exclude_none=True) for tool in tools]}
             elif method == "tools/call":
                 tool_name = params.get("name")
                 tool_arguments = params.get("arguments", {})
@@ -1270,13 +1276,13 @@ You can specify provider:style or provider:resolution format, or let the system 
                     include_image_blocks=include_image_blocks
                 )
                 result = {
-                    "content": [c.model_dump(mode="json") for c in content_result],
+                    "content": [c.model_dump(mode="json", by_alias=True, exclude_none=True) for c in content_result],
                     "structuredContent": safe_structured_result,
                     "isError": not safe_structured_result.get("ok", False)
                 }
             elif method == "resources/list":
                 resources = await self._list_resources()
-                result = {"resources": [r.model_dump(mode='json') for r in resources]}
+                result = {"resources": [r.model_dump(mode="json", by_alias=True, exclude_none=True) for r in resources]}
             elif method == "resources/read":
                 uri = params.get("uri")
                 content = await self._read_resource(uri)
@@ -1289,12 +1295,12 @@ You can specify provider:style or provider:resolution format, or let the system 
                 }
             elif method == "prompts/list":
                 prompts = await self._list_prompts()
-                result = {"prompts": [p.model_dump(mode='json') for p in prompts]}
+                result = {"prompts": [p.model_dump(mode="json", by_alias=True, exclude_none=True) for p in prompts]}
             elif method == "prompts/get":
                 prompt_name = params.get("name")
                 prompt_arguments = params.get("arguments", {})
                 prompt_result = await self._get_prompt(prompt_name, prompt_arguments)
-                result = prompt_result.model_dump(mode='json')
+                result = prompt_result.model_dump(mode="json", by_alias=True, exclude_none=True)
             else:
                 raise ValueError(f"Unknown method: {method}")
 
