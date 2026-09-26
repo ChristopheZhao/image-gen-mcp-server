@@ -66,6 +66,8 @@ class DoubaoProvider(BaseImageProvider):
         model = (model_name or "").strip().lower()
         if not model:
             return 0
+        if "seedream-5" in model:
+            return 1920 * 1920
         if "seedream-4.5" in model or "seedream-4-5" in model:
             return 2560 * 1440
         if "seedream-4.0" in model or "seedream-4-0" in model or "seedream-4" in model:
