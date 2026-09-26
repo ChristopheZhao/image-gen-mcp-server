@@ -1,6 +1,6 @@
 from tencentcloud.common import credential
 from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.aiart.v20221229 import aiart_client, models as aiart_models
+from tencentcloud.hunyuan.v20230901 import hunyuan_client, models as hunyuan_models
 import json
 import base64
 from typing import Dict, List, Optional
@@ -10,12 +10,12 @@ import sys
 from .base import BaseImageProvider, debug_print
 
 class HunyuanProvider(BaseImageProvider):
-    """Tencent HunyuanImage 3.0 image generation provider"""
+    """Tencent Hunyuan image generation provider (SubmitHunyuanImageJob, hunyuan v2023-09-01)"""
 
     def __init__(self, secret_id: str, secret_key: str, **kwargs):
         super().__init__(**kwargs)
         self.cred = credential.Credential(secret_id, secret_key)
-        self.client = aiart_client.AiartClient(self.cred, "ap-guangzhou")
+        self.client = hunyuan_client.HunyuanClient(self.cred, "ap-guangzhou")
 
     def get_provider_name(self) -> str:
         return "hunyuan"
@@ -34,7 +34,7 @@ class HunyuanProvider(BaseImageProvider):
         return None
 
     def get_available_styles(self) -> Dict[str, str]:
-        # HunyuanImage 3.0 has no Style parameter; styles are injected into the prompt
+        # Style codes supported by the SubmitHunyuanImageJob Style parameter
         return {
             "riman": "日漫动画风格, Japanese anime style",
             "xieshi": "写实风格, photorealistic style",
@@ -57,16 +57,16 @@ class HunyuanProvider(BaseImageProvider):
         }
 
     def get_available_resolutions(self) -> Dict[str, str]:
-        # HunyuanImage 3.0: width and height each in [512, 2048], width*height <= 1024*1024
+        # Resolutions supported by SubmitHunyuanImageJob (text-to-image)
         return {
             "768:768": "768:768 (1:1 正方形)",
             "768:1024": "768:1024 (3:4 竖向)",
             "1024:768": "1024:768 (4:3 横向)",
             "1024:1024": "1024:1024 (1:1 正方形大图)",
-            "720:1280": "720:1280 (9:16 竖向)",  # 720*1280=921600 <= 1024*1024=1048576
+            "720:1280": "720:1280 (9:16 竖向)",
             "1280:720": "1280:720 (16:9 横向)",
-            "512:1024": "512:1024 (1:2 竖向)",
-            "1024:512": "1024:512 (2:1 横向)"
+            "768:1280": "768:1280 (3:5 竖向)",
+            "1280:768": "1280:768 (5:3 横向)"
         }
 
     async def generate_images(
@@ -77,28 +77,22 @@ class HunyuanProvider(BaseImageProvider):
         negative_prompt: str = "",
         **kwargs
     ) -> List[Dict]:
-        """Generate images using HunyuanImage 3.0 text-to-image model"""
+        """Generate images using the Hunyuan SubmitHunyuanImageJob async task API"""
         try:
             debug_print(f"[DEBUG] Hunyuan generate_images call started: query={query}, style={style}, resolution={resolution}")
 
-            # Build prompt: inject style description and negative prompt
-            styled_prompt = query
-            if style:
-                style_desc = self.get_available_styles().get(style, "")
-                if style_desc:
-                    styled_prompt = f"{query}, {style_desc}"
-
-            if negative_prompt:
-                styled_prompt = f"{styled_prompt}. Avoid: {negative_prompt}"
-
             # Create request object
-            req = aiart_models.SubmitTextToImageJobRequest()
-            req.Prompt = styled_prompt
+            req = hunyuan_models.SubmitHunyuanImageJobRequest()
+            req.Prompt = query
             req.Resolution = resolution
             req.Revise = 1  # Enable prompt expansion
             req.LogoAdd = 0  # No watermark
+            if style and style in self.get_available_styles():
+                req.Style = style
+            if negative_prompt:
+                req.NegativePrompt = negative_prompt
 
-            debug_print(f"[DEBUG] Calling Tencent API SubmitTextToImageJob: Prompt={styled_prompt}, Resolution={resolution}")
+            debug_print(f"[DEBUG] Calling Tencent API SubmitHunyuanImageJob: Prompt={query}, Resolution={resolution}, Style={style}")
 
             loop = asyncio.get_event_loop()
 
@@ -107,7 +101,7 @@ class HunyuanProvider(BaseImageProvider):
             max_retries = 3
             for attempt in range(max_retries):
                 try:
-                    resp = await loop.run_in_executor(None, self.client.SubmitTextToImageJob, req)
+                    resp = await loop.run_in_executor(None, self.client.SubmitHunyuanImageJob, req)
                     job_id = resp.JobId
                     debug_print(f"[DEBUG] Successfully submitted task, JobId={job_id}")
                     break
@@ -191,12 +185,12 @@ class HunyuanProvider(BaseImageProvider):
             loop = asyncio.get_event_loop()
 
             for attempt in range(max_retries):
-                req = aiart_models.QueryTextToImageJobRequest()
+                req = hunyuan_models.QueryHunyuanImageJobRequest()
                 req.JobId = job_id
 
                 debug_print(f"[DEBUG] Query task status, attempt #{attempt+1}, JobId={job_id}")
                 try:
-                    resp = await loop.run_in_executor(None, self.client.QueryTextToImageJob, req)
+                    resp = await loop.run_in_executor(None, self.client.QueryHunyuanImageJob, req)
                     debug_print(f"[DEBUG] Task status response: {resp.to_json_string()}")
 
                     status_code = resp.JobStatusCode
