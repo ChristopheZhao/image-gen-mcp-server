@@ -59,6 +59,19 @@ class DoubaoFallbackLogicTests(unittest.TestCase):
         self.assertIn("2560x1440", resolutions)
         self.assertIn("2048x2048", resolutions)
 
+    def test_filters_low_resolutions_for_seedream_5_models(self):
+        provider = DoubaoProvider(
+            api_key="test-key",
+            model="doubao-seedream-5-0-260128",
+        )
+        resolutions = provider.get_available_resolutions()
+
+        self.assertNotIn("1024x1024", resolutions)
+        self.assertNotIn("768x768", resolutions)
+        self.assertIn("2048x2048", resolutions)
+        self.assertIn("2304x1728", resolutions)
+        self.assertIn("2560x1440", resolutions)
+
 
 if __name__ == "__main__":
     unittest.main()

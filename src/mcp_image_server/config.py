@@ -167,14 +167,14 @@ class ServerConfig(BaseSettings):
     )
 
     doubao_model: str = Field(
-        default="doubao-seedream-4.5",
-        description="Doubao primary model name (recommended: doubao-seedream-4.5)",
+        default="doubao-seedream-5-0-260128",
+        description="Doubao primary model name (recommended: doubao-seedream-5-0-260128, i.e. Seedream 5.0 lite)",
         validation_alias=AliasChoices('DOUBAO_MODEL', 'doubao_model')
     )
 
     doubao_fallback_model: str = Field(
-        default="doubao-seedream-4.0",
-        description="Doubao fallback model name used when primary model is unavailable",
+        default="doubao-seedream-4-5-251128",
+        description="Doubao fallback model name used when primary model is unavailable (default: doubao-seedream-4-5-251128, i.e. Seedream 4.5)",
         validation_alias=AliasChoices('DOUBAO_FALLBACK_MODEL', 'doubao_fallback_model')
     )
 
