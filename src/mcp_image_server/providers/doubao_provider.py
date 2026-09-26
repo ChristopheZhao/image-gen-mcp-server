@@ -160,6 +160,7 @@ class DoubaoProvider(BaseImageProvider):
             "n": 1,
             "size": size,
             "response_format": "b64_json",
+            "watermark": False,  # No watermark (consistent with Hunyuan LogoAdd=0)
         }
         if negative_prompt:
             request_data["negative_prompt"] = negative_prompt

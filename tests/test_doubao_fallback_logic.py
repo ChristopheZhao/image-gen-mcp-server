@@ -73,5 +73,30 @@ class DoubaoFallbackLogicTests(unittest.TestCase):
         self.assertIn("2560x1440", resolutions)
 
 
+class DoubaoRequestPayloadTests(unittest.IsolatedAsyncioTestCase):
+    async def test_request_disables_watermark(self):
+        captured = {}
+
+        class _Resp:
+            status = 200
+            async def json(self):
+                return {"data": []}
+            async def text(self):
+                return ""
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, *exc):
+                return False
+
+        class _Session:
+            def post(self, url, headers=None, json=None, timeout=None):
+                captured["json"] = json
+                return _Resp()
+
+        provider = DoubaoProvider(api_key="test-key", model="doubao-seedream-5-0-260128")
+        await provider._request_generation(_Session(), provider.model, "a cat", "2048x2048", "", {})
+        self.assertIs(captured["json"].get("watermark"), False)
+
+
 if __name__ == "__main__":
     unittest.main()
