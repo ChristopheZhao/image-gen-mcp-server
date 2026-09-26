@@ -108,6 +108,8 @@ class HTTPReloadConfigTests(unittest.IsolatedAsyncioTestCase):
                 "OPENAI_API_KEY": "openai-test-key",
                 "OPENAI_MODEL": "gpt-image-test-a",
                 "MCP_DEFAULT_PROVIDER": "openai",
+                # Empty string overrides any DOUBAO_API_KEY from .env (env vars beat dotenv)
+                "DOUBAO_API_KEY": "",
             },
             clear=True,
         ):
